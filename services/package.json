@@ -1,0 +1,22 @@
+{
+  "name": "perpetua-services",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node src/index.ts",
+    "indexer": "node src/run-indexer.ts",
+    "jury": "node src/run-jury.ts",
+    "seed": "node src/scripts/seed-claims.ts",
+    "demo:move": "node src/scripts/demo-price-mover.ts",
+    "test": "node --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "near-api-js": "^7.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.0"
+  }
+}
