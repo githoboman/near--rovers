@@ -48,7 +48,8 @@ Per project rule #4, ambiguous design choices were resolved with the simplest so
 11. **Rust toolchain compatibility:** `contract/rust-toolchain.toml` pins `1.97.1` with `wasm32-unknown-unknown` to satisfy `near-sdk 5.30.1` and `near-workspaces 0.24.0` (`rust-version = "1.95"`, `edition = "2024"`).
 12. **Offchain indexing & SQLite via Node built-ins:** [`services/`](services/) polls contract view state via `near-api-js` (`JsonRpcProvider`) into Node's built-in `node:sqlite` (`DatabaseSync`), avoiding external indexer API rate limits and native C++ SQLite addon builds on Windows.
 13. **Direct NEAR AI Cloud REST + Ed25519 verification:** Rather than bundling `@nearai/inference-sdk` (which documents Node `>= 24.22.1` vs local Node `24.11.1`), [`services/src/ai/nearAiClient.ts`](services/src/ai/nearAiClient.ts) calls `GET /v1/attestation/report`, `POST /v1/chat/completions` (`stream: false`, `x-no-aliasing: true`, raw byte preservation), and `GET /v1/signature/{chat_id}` (`signing_algo=ed25519`), checking preflight nonce/signer binding and verifying Ed25519 signatures over `SHA-256(exact_bytes)` with `node:crypto`.
-14. **Default TEE jury & page models:** Defaults to three distinct NEAR-hosted (`owned_by: "nearai"`) chat models verified in `/v1/models` — `deepseek-ai/DeepSeek-V4.1-Flash-1017`, `Qwen/Qwen3.8-27B`, and `z-ai/glm-5.3-flash` — requiring a `ceil(2N/3)` (`2/3`) supermajority and falling back to `Verdict::Unresolved` on split/abstention. Models, supermajority ratio, RPC URL, and DB path are configurable via `.env`.
+14. **Default TEE jury & page models:** Defaults to three distinct NEAR-hosted (`owned_by: "nearai"`) Confidential TEE models verified in `/v1/models` — `deepseek-ai/DeepSeek-V4.1-Flash-1017`, `Qwen/Qwen3.6-35B-A3B-FP8`, and `z-ai/glm-5.3-flash` — requiring a `ceil(2N/3)` (`2/3`) supermajority and falling back to `Verdict::Unresolved` on split/abstention, with `Qwen/Qwen3-VL-30B-A3B-Instruct` as the low-latency non-reasoning page generator. Live tests showed `Qwen/Qwen3.8-27B` consumes `>3000` reasoning tokens before emitting JSON; `JURY_MODELS`, `PAGE_MODEL`, supermajority ratio, RPC URL, and DB path are configurable via `.env`.
+15. **Cited evidence packet fetching:** [`JuryService`](services/src/jury/index.ts) performs bounded (`10s` timeout, public `https://` only, private/localhost blocked, HTML-stripped `<= 2800` chars) source excerpt snapshots into the hashed `evidence_packet_json` so jurors evaluate actual cited page content alongside claim text and price history.
 
 ---
 
@@ -97,7 +98,7 @@ Verified locally:
 - [`services/src/jury/index.ts`](services/src/jury/index.ts): Evidence packet builder, parallel 3-model TEE jury runner, supermajority tallier, raw-output & attestation archival, and `submit_ruling` submitter.
 - [`services/src/generator/index.ts`](services/src/generator/index.ts): Confidence-annotated article synthesizer computing `sha256(snapshot + prompt + model)` and publishing via `set_page_hash`.
 - [`services/src/server.ts`](services/src/server.ts) & [`services/src/orchestrator.ts`](services/src/orchestrator.ts): Dependency-free `node:http` API exposing `/health`, `/api/claims`, `/api/claims/:id`, `/api/claims/:id/sync`, plus Phase 4 1Click preview routes `/api/intents/tokens` and `/api/intents/quote` (`dry: true` enforced on testnet).
-- [`services/src/scripts/seed-claims.ts`](services/src/scripts/seed-claims.ts) & [`services/src/scripts/demo-price-mover.ts`](services/src/scripts/demo-price-mover.ts): 24 contested Web3 claim seeder and live trade -> re-index -> page-rewrite demonstration script.
+- [`services/src/scripts/seed-claims.ts`](services/src/scripts/seed-claims.ts), [`services/src/scripts/deploy-testnet.ts`](services/src/scripts/deploy-testnet.ts) & [`services/src/scripts/demo-price-mover.ts`](services/src/scripts/demo-price-mover.ts): pure-Node contract deployer, 24 contested Web3 claim seeder, and live trade -> re-index -> page-rewrite demonstration script.
 
 ### Commands & Verified Test Notes
 
@@ -111,8 +112,9 @@ pnpm dev
 
 Verified locally:
 
-- `npx tsc --noEmit`: **0 errors**.
-- `node --test tests/*.test.ts`: **5 passed, 0 failed** (`AMM integer parity`, `SQLite DB persistence & price deduplication`, `Jury supermajority tally`, `NEAR AI Cloud client + Jury + Page Generator` against a cryptographic Ed25519 mock gateway/model server, and `Phase 4 OneClick Intents preview safety`).
+- `tsc --noEmit`: **0 errors**.
+- `node --test tests/*.test.ts`: **6 passed, 0 failed** (`AMM integer parity`, `SQLite DB persistence & price deduplication`, `Jury supermajority tally`, `SSRF private-URL filter`, `NEAR AI Cloud client + Jury + Page Generator` against a cryptographic Ed25519 mock gateway/model server, and `Phase 4 OneClick Intents preview safety`).
+- Live NEAR AI Cloud TEE smoke test (`cloud-api.near.ai/v1`): Verified all 3 jury models (`deepseek-ai/DeepSeek-V4.1-Flash-1017`, `Qwen/Qwen3.6-35B-A3B-FP8`, `z-ai/glm-5.3-flash`) plus page generator (`Qwen/Qwen3-VL-30B-A3B-Instruct`) returned `signature_kind: "provider_tee"`, matched preflight attestation nonces, and passed local `node:crypto` Ed25519 signature verification (`signatureValid: true`, 4/4 calls).
 
 ---
 

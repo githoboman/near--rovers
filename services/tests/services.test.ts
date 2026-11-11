@@ -8,7 +8,7 @@ import type { PerpetuaServiceConfig } from "../src/config.ts";
 import { PerpetuaDatabase } from "../src/db/index.ts";
 import { PageGeneratorService } from "../src/generator/index.ts";
 import { OneClickIntentsClient } from "../src/intents/oneClick.ts";
-import { JuryService, tallySupermajority } from "../src/jury/index.ts";
+import { isPublicHttpsUrl, JuryService, tallySupermajority } from "../src/jury/index.ts";
 import type { PerpetuaNearClient } from "../src/near/client.ts";
 import type { ClaimView, MarketView } from "../src/types.ts";
 
@@ -72,10 +72,10 @@ function baseConfig(): PerpetuaServiceConfig {
     nearAiApiKey: "sk-test",
     juryModels: [
       "deepseek-ai/DeepSeek-V4.1-Flash-1017",
-      "Qwen/Qwen3.8-27B",
+      "Qwen/Qwen3.6-35B-A3B-FP8",
       "z-ai/glm-5.3-flash",
     ],
-    pageModel: "Qwen/Qwen3.8-27B",
+    pageModel: "Qwen/Qwen3-VL-30B-A3B-Instruct",
     jurySupermajorityNumerator: 2,
     jurySupermajorityDenominator: 3,
     oneClickApiUrl: "https://1click.chaindefuser.com",
@@ -201,6 +201,15 @@ describe("Jury supermajority tally", () => {
       3,
     );
     assert.equal(abstain.verdict, "Unresolved");
+  });
+
+  it("blocks non-HTTPS and private/localhost URLs from evidence fetching", () => {
+    assert.equal(isPublicHttpsUrl("https://github.com/Uniswap/v3-core"), true);
+    assert.equal(isPublicHttpsUrl("http://github.com/Uniswap/v3-core"), false);
+    assert.equal(isPublicHttpsUrl("https://localhost:3001/secret"), false);
+    assert.equal(isPublicHttpsUrl("https://127.0.0.1/admin"), false);
+    assert.equal(isPublicHttpsUrl("https://192.168.1.10/status"), false);
+    assert.equal(isPublicHttpsUrl("https://169.254.169.254/latest/meta-data"), false);
   });
 });
 
@@ -372,6 +381,7 @@ describe("NEAR AI Cloud client + Jury + Page Generator (cryptographic Ed25519 mo
 
       const ruling = await jury.resolveEscalatedClaim(claim, market, {
         submitOnChain: false,
+        fetchEvidenceSources: false,
       });
       assert.equal(ruling.verdict, "True");
       assert.equal(ruling.supermajority_count, 2);

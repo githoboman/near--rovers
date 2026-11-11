@@ -12,6 +12,12 @@ import type {
   Verdict,
 } from "../types.ts";
 
+export interface CitedSourceSnapshot {
+  uri: string;
+  status: number | null;
+  excerpt: string;
+}
+
 export interface JuryEvidencePacket {
   claim_id: number;
   epoch: number;
@@ -19,11 +25,74 @@ export interface JuryEvidencePacket {
   text_hash: string;
   category: string;
   evidence_uris: string[];
+  cited_sources: CitedSourceSnapshot[];
   challenger_side: Outcome | null;
   counter_side: Outcome | null;
   snap_yes_price_e6: number | null;
   escalated_at: string | null;
   recent_price_history: PriceHistoryPoint[];
+}
+
+export function isPublicHttpsUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== "https:") return false;
+    const h = u.hostname.toLowerCase();
+    if (
+      h === "localhost" ||
+      h.endsWith(".local") ||
+      h === "::1" ||
+      h.startsWith("127.") ||
+      h.startsWith("10.") ||
+      h.startsWith("192.168.") ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(h) ||
+      h.startsWith("169.254.")
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function fetchCitedSourceExcerpts(
+  uris: string[],
+  timeoutMs = 10000,
+): Promise<CitedSourceSnapshot[]> {
+  const limited = uris.slice(0, 5);
+  return Promise.all(
+    limited.map(async (uri): Promise<CitedSourceSnapshot> => {
+      if (!isPublicHttpsUrl(uri)) {
+        return { uri, status: null, excerpt: "Skipped non-HTTPS or private URI." };
+      }
+      try {
+        const res = await fetch(uri, {
+          headers: { Accept: "text/plain, text/markdown, application/json, text/html" },
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+        const raw = await res.text();
+        const plain = raw
+          .replace(/<script[\s\S]*?<\/script>/gi, " ")
+          .replace(/<style[\s\S]*?<\/style>/gi, " ")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 2800);
+        return {
+          uri,
+          status: res.status,
+          excerpt: plain || `HTTP ${res.status} (empty body)`,
+        };
+      } catch (err) {
+        return {
+          uri,
+          status: null,
+          excerpt: `Source fetch unavailable: ${err instanceof Error ? err.message : String(err)}`,
+        };
+      }
+    }),
+  );
 }
 
 interface ParsedModelVote {
@@ -112,9 +181,16 @@ export class JuryService {
     this.aiClient = aiClient;
   }
 
-  buildEvidencePacket(claim: ClaimView, market: MarketView): JuryEvidencePacket {
+  async buildEvidencePacket(
+    claim: ClaimView,
+    market: MarketView,
+    fetchSources = true,
+  ): Promise<JuryEvidencePacket> {
     const history = this.db.getPriceHistory(claim.id, market.epoch);
     const recentHistory = history.slice(-20);
+    const citedSources = fetchSources
+      ? await fetchCitedSourceExcerpts(claim.evidence_uris)
+      : [];
     return {
       claim_id: claim.id,
       epoch: market.epoch,
@@ -122,6 +198,7 @@ export class JuryService {
       text_hash: claim.text_hash,
       category: claim.category,
       evidence_uris: claim.evidence_uris,
+      cited_sources: citedSources,
       challenger_side: market.challenger_side,
       counter_side: market.counter_side,
       snap_yes_price_e6: market.snap_yes_price_e6,
@@ -133,7 +210,7 @@ export class JuryService {
   async resolveEscalatedClaim(
     claim: ClaimView,
     market: MarketView,
-    opts?: { submitOnChain?: boolean },
+    opts?: { submitOnChain?: boolean; fetchEvidenceSources?: boolean },
   ): Promise<JuryRulingRecord> {
     const existing = this.db.getJuryRuling(claim.id, market.epoch);
     if (existing) {
@@ -155,7 +232,11 @@ export class JuryService {
       return existing;
     }
 
-    const packet = this.buildEvidencePacket(claim, market);
+    const packet = await this.buildEvidencePacket(
+      claim,
+      market,
+      opts?.fetchEvidenceSources ?? true,
+    );
     const evidencePacketJson = JSON.stringify(packet);
     const evidenceHash = sha256Hex(evidencePacketJson);
 
@@ -179,6 +260,15 @@ export class JuryService {
       })`,
       `Cited Evidence URIs (${packet.evidence_uris.length}):`,
       ...packet.evidence_uris.map((u, idx) => `  [${idx + 1}] ${u}`),
+      ...(packet.cited_sources.length > 0
+        ? [
+            "Fetched Source Excerpts:",
+            ...packet.cited_sources.map(
+              (s, idx) =>
+                `  [${idx + 1}] (${s.status ?? "err"}) ${s.uri} -> ${s.excerpt}`,
+            ),
+          ]
+        : []),
       `Recent Price Trajectory (${packet.recent_price_history.length} samples):`,
       JSON.stringify(
         packet.recent_price_history.map((p) => ({
@@ -254,7 +344,7 @@ export class JuryService {
               { role: "user", content: userPrompt },
             ],
             temperature: 0.1,
-            maxTokens: 500,
+            maxTokens: 3000,
           });
           const parsed = extractJsonObject<ParsedModelVote>(completion.content);
           const vote = normalizeVerdictVote(parsed?.vote);

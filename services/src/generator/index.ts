@@ -205,7 +205,7 @@ export class PageGeneratorService {
             { role: "user", content: prompt },
           ],
           temperature: 0.2,
-          maxTokens: 900,
+          maxTokens: 4000,
         });
 
         chatId = res.chatId;

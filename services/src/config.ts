@@ -26,11 +26,11 @@ export interface PerpetuaServiceConfig {
 
 const DEFAULT_JURY_MODELS = [
   "deepseek-ai/DeepSeek-V4.1-Flash-1017",
-  "Qwen/Qwen3.8-27B",
+  "Qwen/Qwen3.6-35B-A3B-FP8",
   "z-ai/glm-5.3-flash",
 ];
 
-const DEFAULT_PAGE_MODEL = "Qwen/Qwen3.8-27B";
+const DEFAULT_PAGE_MODEL = "Qwen/Qwen3-VL-30B-A3B-Instruct";
 
 function loadEnvIfPresent(): void {
   const candidates = [

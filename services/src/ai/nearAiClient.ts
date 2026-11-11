@@ -182,7 +182,7 @@ export class NearAiCloudClient {
       messages: params.messages,
       stream: false,
       temperature: params.temperature ?? 0.2,
-      max_tokens: params.maxTokens ?? 1200,
+      max_tokens: params.maxTokens ?? 3000,
     };
     const rawRequest = JSON.stringify(requestPayload);
     const requestHash = sha256Hex(rawRequest);
