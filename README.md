@@ -55,6 +55,7 @@ Per project rule #4, ambiguous design choices were resolved with the simplest so
 ## Phase 1: Smart Contract (`contract/`)
 
 ### Built Components
+
 - [`contract/src/types.rs`](contract/src/types.rs): `Claim`, `Market`, `Position`, `Verdict`, `Outcome`, status enums, `CollateralAsset`, and JSON view types.
 - [`contract/src/amm.rs`](contract/src/amm.rs): Checked `U256` arithmetic (`mul_u128`, `div_rem`, `isqrt_floor`/`isqrt_ceil`), `price_e6`, `quote_buy`, and `quote_sell`.
 - [`contract/src/collateral.rs`](contract/src/collateral.rs): Collateral deposit extraction, excess refund, and callback-safe payout adapter.
@@ -78,6 +79,7 @@ cd workspaces-tests && cargo test
 ```
 
 Verified locally:
+
 - `cargo test --lib`: **11 passed, 0 failed** (`1.92s`).
 - `RUSTFLAGS="--cfg near" cargo build --target wasm32-unknown-unknown --release`: compiled `perpetua_contract.wasm` (**530,951 bytes**).
 
@@ -86,6 +88,7 @@ Verified locally:
 ## Phase 2: Offchain Services (`services/`)
 
 ### Built Components
+
 - [`services/src/config.ts`](services/src/config.ts) & [`services/src/types.ts`](services/src/types.ts): Environment loader (`NEAR_CONTRACT_ID`, `NEAR_RESOLVER_PRIVATE_KEY`, `NEAR_AI_API_KEY`, `JURY_MODELS`, `PAGE_MODEL`, `PERPETUA_DB_PATH`, `SERVICES_PORT`) and exact contract-aligned types.
 - [`services/src/db/index.ts`](services/src/db/index.ts): SQLite store (`claims`, `markets`, `price_history`, `jury_rulings`, `jury_model_outputs`, `generated_pages`, `indexer_state`).
 - [`services/src/near/client.ts`](services/src/near/client.ts): `near-api-js@7.4.0` RPC reader (`JsonRpcProvider`) + resolver transaction signer (`Account.callFunction`) for `create_claim`, `buy`, `escalate`, `submit_ruling`, `settle`, `set_page_hash`.
@@ -107,6 +110,7 @@ pnpm dev
 ```
 
 Verified locally:
+
 - `npx tsc --noEmit`: **0 errors**.
 - `node --test tests/*.test.ts`: **5 passed, 0 failed** (`AMM integer parity`, `SQLite DB persistence & price deduplication`, `Jury supermajority tally`, `NEAR AI Cloud client + Jury + Page Generator` against a cryptographic Ed25519 mock gateway/model server, and `Phase 4 OneClick Intents preview safety`).
 
@@ -115,14 +119,28 @@ Verified locally:
 ## Phase 3: Frontend (`web/`)
 
 ### Built Components
+
 - **Wallet Integration ([`web/src/providers/NearProvider.tsx`](web/src/providers/NearProvider.tsx), [`web/src/lib/near.ts`](web/src/lib/near.ts)):** `@hot-labs/near-connect` (`NearConnector({ network: "testnet" })`) for wallet sign-in and `FunctionCall` transactions, paired with `near-api-js` `JsonRpcProvider` for RPC views.
 - **Store & Math Parity ([`web/src/lib/amm.ts`](web/src/lib/amm.ts), [`web/src/providers/PerpetuaStore.tsx`](web/src/providers/PerpetuaStore.tsx)):** Exact `bigint` CPMM (`x * y = k`) math matching `contract/src/amm.rs`, supporting both **Live Testnet** mode (via `/services` API or direct RPC fallback) and **Demo Ledger** mode (with 24 seeded Web3 protocol claims across audit status, authorship, and TVL).
 - **Views (`web/src/app/` & `web/src/components/`):**
   - Encyclopedia claim list with category/status filters and KPI strip (`/`)
   - Claim detail workspace (`/claims/[id]`): AI article with inline sentence confidence highlighting, custom SVG price history chart, buy/sell CPMM widget, optimistic escalation + jury display + settlement/redemption controls, and interactive Demo Script buttons that move prices and rewrite article prose
-  - New Claim submission page (`/create`)
+  - New Claim submission page (`/create`) with collapsible Phase 4 [`IntentsDepositPreview`](web/src/components/IntentsDepositPreview.tsx) card (enforces `dry=true` preview quotes via [`services/src/intents/oneClick.ts`](services/src/intents/oneClick.ts))
 
-*(Frontend build & typecheck verification pending dependency installation completion.)*
+### Commands & Verified Build Notes
+
+```bash
+cd web
+pnpm install
+pnpm typecheck
+pnpm build
+pnpm dev
+```
+
+Verified locally:
+
+- `npx tsc --noEmit`: **0 errors**.
+- `pnpm build` (`next build` 16.4.6 Turbopack): **exit 0** — compiled cleanly (`/` static, `/_not-found` static, `/claims/[id]` dynamic, `/create` static).
 
 ---
 

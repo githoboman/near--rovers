@@ -43,3 +43,4 @@ main().catch((err) => {
   console.error("[indexer] fatal:", err);
   process.exit(1);
 });
+

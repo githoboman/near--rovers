@@ -68,3 +68,4 @@ export class PerpetuaOrchestrator {
     return { sync, rulingsProcessed, pagesGenerated };
   }
 }
+

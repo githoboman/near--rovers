@@ -85,3 +85,4 @@ export function yoctoToNearNumber(yoctoStr: string): number {
   const frac = v % YOCTO_PER_NEAR;
   return Number(whole) + Number(frac) / 1e24;
 }
+
