@@ -8,6 +8,7 @@
     "indexer": "node src/run-indexer.ts",
     "jury": "node src/run-jury.ts",
     "seed": "node src/scripts/seed-claims.ts",
+    "wallet:new": "node src/scripts/wallet-setup.ts",
     "deploy:testnet": "node src/scripts/deploy-testnet.ts",
     "demo:move": "node src/scripts/demo-price-mover.ts",
     "test": "node --test tests/*.test.ts",

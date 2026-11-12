@@ -189,7 +189,7 @@ async function main(): Promise<void> {
 
   const epochLengthNs =
     process.env.SEED_EPOCH_LENGTH_NS || String(7 * 86_400 * 1_000_000_000);
-  const depositNear = process.env.SEED_DEPOSIT_NEAR || "2.5";
+  const depositNear = process.env.SEED_DEPOSIT_NEAR || "0.08";
   const withTrades = process.env.SEED_WITH_TRADES === "true";
 
   const existingCount = await nearClient.getClaimsCount();
