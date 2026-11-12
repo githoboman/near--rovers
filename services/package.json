@@ -11,6 +11,7 @@
     "wallet:new": "node src/scripts/wallet-setup.ts",
     "deploy:testnet": "node src/scripts/deploy-testnet.ts",
     "demo:move": "node src/scripts/demo-price-mover.ts",
+    "e2e:testnet": "node src/scripts/e2e-testnet.ts",
     "test": "node --test tests/*.test.ts",
     "typecheck": "tsc --noEmit"
   },

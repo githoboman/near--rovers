@@ -81,8 +81,8 @@ cd workspaces-tests && cargo test
 
 Verified locally:
 
-- `cargo test --lib`: **11 passed, 0 failed** (`1.92s`).
-- `RUSTFLAGS="--cfg near" cargo build --target wasm32-unknown-unknown --release`: compiled `perpetua_contract.wasm` (**530,951 bytes**).
+- `cargo test --lib`: **11 passed, 0 failed** (`1.90s`).
+- `RUSTFLAGS="--cfg near" cargo build --target wasm32-unknown-unknown --release`: compiled `perpetua_contract.wasm` (**301,954 bytes** with `strip = "symbols"`, reduced to **249,670 bytes** via `wasm-opt -Oz` for deployment).
 
 ---
 
@@ -92,13 +92,13 @@ Verified locally:
 
 - [`services/src/config.ts`](services/src/config.ts) & [`services/src/types.ts`](services/src/types.ts): Environment loader (`NEAR_CONTRACT_ID`, `NEAR_RESOLVER_PRIVATE_KEY`, `NEAR_AI_API_KEY`, `JURY_MODELS`, `PAGE_MODEL`, `PERPETUA_DB_PATH`, `SERVICES_PORT`) and exact contract-aligned types.
 - [`services/src/db/index.ts`](services/src/db/index.ts): SQLite store (`claims`, `markets`, `price_history`, `jury_rulings`, `jury_model_outputs`, `generated_pages`, `indexer_state`).
-- [`services/src/near/client.ts`](services/src/near/client.ts): `near-api-js@7.4.0` RPC reader (`JsonRpcProvider`) + resolver transaction signer (`Account.callFunction`) for `create_claim`, `buy`, `escalate`, `submit_ruling`, `settle`, `set_page_hash`.
+- [`services/src/near/client.ts`](services/src/near/client.ts): `near-api-js@7.4.0` RPC reader (`JsonRpcProvider`) + resolver transaction signer (`Account.callFunction`) for `create_claim`, `buy`, `escalate`, `submit_ruling`, `settle`, `redeem`, `set_page_hash`, and `getPosition`.
 - [`services/src/ai/nearAiClient.ts`](services/src/ai/nearAiClient.ts): NEAR AI Cloud preflight attestation fetcher, raw-byte SHA-256 request/response hasher, and `node:crypto` Ed25519 signature verifier (`provider_tee` and `gateway` payloads).
 - [`services/src/indexer/index.ts`](services/src/indexer/index.ts): Contract state & price-history poller.
 - [`services/src/jury/index.ts`](services/src/jury/index.ts): Evidence packet builder, parallel 3-model TEE jury runner, supermajority tallier, raw-output & attestation archival, and `submit_ruling` submitter.
 - [`services/src/generator/index.ts`](services/src/generator/index.ts): Confidence-annotated article synthesizer computing `sha256(snapshot + prompt + model)` and publishing via `set_page_hash`.
 - [`services/src/server.ts`](services/src/server.ts) & [`services/src/orchestrator.ts`](services/src/orchestrator.ts): Dependency-free `node:http` API exposing `/health`, `/api/claims`, `/api/claims/:id`, `/api/claims/:id/sync`, plus Phase 4 1Click preview routes `/api/intents/tokens` and `/api/intents/quote` (`dry: true` enforced on testnet).
-- [`services/src/scripts/seed-claims.ts`](services/src/scripts/seed-claims.ts), [`services/src/scripts/deploy-testnet.ts`](services/src/scripts/deploy-testnet.ts) & [`services/src/scripts/demo-price-mover.ts`](services/src/scripts/demo-price-mover.ts): pure-Node contract deployer, 24 contested Web3 claim seeder, and live trade -> re-index -> page-rewrite demonstration script.
+- [`services/src/scripts/seed-claims.ts`](services/src/scripts/seed-claims.ts), [`services/src/scripts/deploy-testnet.ts`](services/src/scripts/deploy-testnet.ts), [`services/src/scripts/demo-price-mover.ts`](services/src/scripts/demo-price-mover.ts) & [`services/src/scripts/e2e-testnet.ts`](services/src/scripts/e2e-testnet.ts): pure-Node contract deployer, 24 contested Web3 claim seeder, price-mover script, and full live Testnet end-to-end verification runner.
 
 ### Commands & Verified Test Notes
 
@@ -143,6 +143,18 @@ Verified locally:
 
 - `npx tsc --noEmit`: **0 errors**.
 - `pnpm build` (`next build` 16.4.6 Turbopack): **exit 0** — compiled cleanly (`/` static, `/_not-found` static, `/claims/[id]` dynamic, `/create` static).
+
+---
+
+## Live NEAR Testnet Verification
+
+- **Deployed Testnet Contract:** `570dcb106c2e8797eb86646401cffa35dd07ea08e40a49f2973453722584ff03` (`fee_bps: 100`, demo `escalation_bond: 50000000000000000000000` [0.05 NEAR], demo `challenge_window_ns: 15000000000` [15s], seeded with **24** claims via `seed-claims.ts`, `get_claims_count() === 24`).
+- **End-to-End Claim #4 Execution ([`e2e-testnet.ts`](services/src/scripts/e2e-testnet.ts)):**
+  1. Initial trades (`buy(No, 0.015)` + `buy(Yes, 0.025)`) + NEAR AI Cloud TEE page v1 (`79.70% YES`, `page_hash=8df90b91...`) verified on-chain via `set_page_hash`.
+  2. Price-moving trade (`buy(Yes, 0.06)`) -> page v2 regenerated (`91.93% YES`, `page_hash=90c9d699...`) with updated `page_hash` verified on-chain.
+  3. `escalate` (`0.05 NEAR` bond + refundable storage buffer) -> **3/3 TEE-verified models** rendered `Unresolved` verdict (`attestation_hash=6e2a6178...`) -> `submit_ruling` -> `market_status=Ruled`.
+  4. Waited 15s challenge window -> `settle` finalized Epoch 1 (`Settled`) and opened **Epoch 2** -> `redeem(4, 1)` redeemed both sides down to `(YES: 0, NO: 0)`.
+- **Live HTTP & Intents Check:** Verified `services` (`GET /health`, `GET /api/claims` returning `total: 24`, `GET /api/claims/4`, `GET /api/intents/tokens`, `POST /api/intents/quote` returning a live `dry=true` quote from `1click.chaindefuser.com`).
 
 ---
 

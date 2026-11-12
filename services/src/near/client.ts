@@ -104,6 +104,28 @@ export class PerpetuaNearClient {
     }) as Promise<MarketView | null>;
   }
 
+  async getPosition(
+    claimId: number,
+    accountId: string,
+    epoch?: number,
+  ): Promise<{ yes_shares: string; no_shares: string; claim_id: number; epoch: number; account_id: string }> {
+    const contractId = this.assertContract();
+    return this.provider.callFunction({
+      contractId,
+      method: "get_position",
+      args:
+        epoch !== undefined
+          ? { claim_id: claimId, account_id: accountId, epoch }
+          : { claim_id: claimId, account_id: accountId },
+    }) as Promise<{
+      yes_shares: string;
+      no_shares: string;
+      claim_id: number;
+      epoch: number;
+      account_id: string;
+    }>;
+  }
+
   async getPrice(claimId: number, epoch?: number): Promise<PriceQuote> {
     const contractId = this.assertContract();
     return this.provider.callFunction({
@@ -209,6 +231,19 @@ export class PerpetuaNearClient {
       methodName: "settle",
       args: { claim_id: claimId },
       gas: teraToGas("100"),
+      deposit: 0n,
+    });
+    return extractTxHash(outcome);
+  }
+
+  async redeem(claimId: number, epoch?: number): Promise<string> {
+    const contractId = this.assertContract();
+    const account = this.assertSigner();
+    const outcome = await account.callFunction({
+      contractId,
+      methodName: "redeem",
+      args: epoch !== undefined ? { claim_id: claimId, epoch } : { claim_id: claimId },
+      gas: teraToGas("80"),
       deposit: 0n,
     });
     return extractTxHash(outcome);
