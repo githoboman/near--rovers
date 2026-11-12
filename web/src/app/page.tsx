@@ -52,8 +52,8 @@ export default function HomePage() {
   }, [bundles]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-      {/* Editorial Title Row */}
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Header Row */}
       <div
         style={{
           display: "flex",
@@ -65,19 +65,23 @@ export default function HomePage() {
       >
         <div>
           <h1
-            className="serif"
-            style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.2 }}
+            style={{
+              fontSize: 24,
+              fontWeight: 600,
+              letterSpacing: "-0.02em",
+              lineHeight: 1.25,
+              color: "var(--ink)",
+            }}
           >
-            Perpetua Encyclopedia
+            Protocol Fact Registry
           </h1>
-          <p style={{ fontSize: 14.5, color: "var(--muted)", marginTop: 4 }}>
-            Contested Web3 protocol facts priced by continuous binary prediction markets on NEAR{" "}
-            {mode === "demo" ? "(Demo Ledger)" : "(Testnet)"}.
+          <p style={{ fontSize: 13.5, color: "var(--muted)", marginTop: 4 }}>
+            Continuous binary prediction markets pricing factual Web3 claims with optimistic NEAR AI Cloud TEE jury resolution.
           </p>
         </div>
 
         <Link href="/create" className="btn btn-primary">
-          <Plus size={15} />
+          <Plus size={14} />
           <span>Propose Claim</span>
         </Link>
       </div>
@@ -97,36 +101,44 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* 4-column hairline KPI strip */}
+      {/* 4-column KPI strip (Type, not tiles) */}
       <div className="kpi-strip">
         <div className="kpi-cell">
-          <div style={{ fontSize: 12.5, color: "var(--muted)" }}>Tracked Claims</div>
-          <div className="tabular" style={{ fontSize: 26, fontWeight: 500, marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>Tracked Claims</div>
+          <div className="tabular" style={{ fontSize: 24, fontWeight: 600, marginTop: 4, color: "var(--ink)" }}>
             {stats.totalClaims}
           </div>
         </div>
         <div className="kpi-cell">
-          <div style={{ fontSize: 12.5, color: "var(--muted)" }}>Active Disputes</div>
-          <div className="tabular" style={{ fontSize: 26, fontWeight: 500, marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>Active Disputes</div>
+          <div
+            className="tabular"
+            style={{
+              fontSize: 24,
+              fontWeight: 600,
+              marginTop: 4,
+              color: stats.activeDisputes > 0 ? "var(--contested)" : "var(--ink)",
+            }}
+          >
             {stats.activeDisputes}
           </div>
         </div>
         <div className="kpi-cell">
-          <div style={{ fontSize: 12.5, color: "var(--muted)" }}>Pooled Collateral</div>
-          <div className="tabular" style={{ fontSize: 26, fontWeight: 500, marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>Pooled Collateral</div>
+          <div className="tabular" style={{ fontSize: 24, fontWeight: 600, marginTop: 4, color: "var(--ink)" }}>
             {formatNear(stats.totalVault, 2)}{" "}
-            <span style={{ fontSize: 13, color: "var(--muted)" }}>NEAR</span>
+            <span style={{ fontSize: 13, color: "var(--muted)", fontWeight: 400 }}>Ⓝ</span>
           </div>
         </div>
         <div className="kpi-cell">
-          <div style={{ fontSize: 12.5, color: "var(--muted)" }}>Mean Confidence</div>
-          <div className="tabular" style={{ fontSize: 26, fontWeight: 500, marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>Mean Confidence</div>
+          <div className="tabular" style={{ fontSize: 24, fontWeight: 600, marginTop: 4, color: "var(--yes)" }}>
             {formatPct(stats.avgYes, 1)}
           </div>
         </div>
       </div>
 
-      {/* Filters & Search */}
+      {/* Filters & Search Control Bar */}
       <div
         style={{
           display: "flex",
@@ -137,21 +149,25 @@ export default function HomePage() {
         }}
       >
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-          {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              className="btn btn-sm"
-              onClick={() => setCategory(key)}
-              style={{
-                background: category === key ? "var(--ink)" : "var(--surface)",
-                color: category === key ? "#ffffff" : "var(--ink)",
-                borderColor: category === key ? "var(--ink)" : "var(--border)",
-              }}
-            >
-              {label}
-            </button>
-          ))}
+          {Object.entries(CATEGORY_LABELS).map(([key, label]) => {
+            const isActive = category === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                className="btn btn-sm"
+                onClick={() => setCategory(key)}
+                style={{
+                  background: isActive ? "var(--surface-hover)" : "var(--surface)",
+                  color: isActive ? "var(--ink)" : "var(--muted)",
+                  borderColor: isActive ? "var(--border-strong)" : "var(--border)",
+                  fontWeight: isActive ? 600 : 400,
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -172,14 +188,14 @@ export default function HomePage() {
           <div style={{ position: "relative", width: 240 }}>
             <Search
               size={14}
-              color="var(--muted)"
+              color="var(--muted-light)"
               style={{ position: "absolute", left: 10, top: 9 }}
             />
             <input
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search protocol claims..."
+              placeholder="Filter claims or #ID..."
               className="field-input"
               style={{ height: 32, paddingLeft: 30, fontSize: 13 }}
             />
@@ -187,31 +203,31 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Claim Table */}
+      {/* Claim Ledger Table */}
       <section className="panel" style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid var(--border)", fontSize: 12, color: "var(--muted)" }}>
-              <th style={{ padding: "11px 16px", fontWeight: 500 }}>Claim & Citation</th>
-              <th style={{ padding: "11px 12px", fontWeight: 500 }}>Domain</th>
-              <th style={{ padding: "11px 12px", fontWeight: 500 }}>Status</th>
-              <th style={{ padding: "11px 12px", fontWeight: 500, textAlign: "right" }}>Epoch</th>
-              <th style={{ padding: "11px 16px", fontWeight: 500, textAlign: "right" }}>
-                YES Confidence
+              <th style={{ padding: "10px 16px", fontWeight: 500 }}>Claim Statement & Primary Citation</th>
+              <th style={{ padding: "10px 12px", fontWeight: 500 }}>Domain</th>
+              <th style={{ padding: "10px 12px", fontWeight: 500 }}>Status</th>
+              <th style={{ padding: "10px 12px", fontWeight: 500, textAlign: "right" }}>Epoch</th>
+              <th style={{ padding: "10px 16px", fontWeight: 500, textAlign: "right" }}>
+                Confidence (YES)
               </th>
             </tr>
           </thead>
           <tbody>
             {loading && filtered.length === 0 ? (
               <tr>
-                <td colSpan={5} style={{ padding: 32, textAlign: "center", color: "var(--muted)" }}>
-                  Loading market claims...
+                <td colSpan={5} style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>
+                  Loading market claims from {mode === "live" ? "NEAR network" : "ledger"}...
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={5} style={{ padding: 32, textAlign: "center", color: "var(--muted)" }}>
-                  No claims match the current filter.
+                <td colSpan={5} style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>
+                  No claims match the selected criteria.
                 </td>
               </tr>
             ) : (
@@ -219,12 +235,22 @@ export default function HomePage() {
                 const band = confidenceBand(b.market.yes_price_e6);
                 const pillClass =
                   band === "high" ? "pill-yes" : band === "low" ? "pill-no" : "pill-contested";
+                const pctNumber = Math.round(b.market.yes_price_e6 / 10_000);
                 return (
                   <tr
                     key={b.claim.id}
-                    style={{ borderBottom: "1px solid var(--border)" }}
+                    style={{
+                      borderBottom: "1px solid var(--border)",
+                      transition: "background 0.12s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = "var(--surface-muted)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = "transparent";
+                    }}
                   >
-                    <td style={{ padding: "14px 16px", maxWidth: 560 }}>
+                    <td style={{ padding: "12px 16px", maxWidth: 540 }}>
                       <Link
                         href={`/claims/${b.claim.id}`}
                         style={{
@@ -233,18 +259,19 @@ export default function HomePage() {
                           alignItems: "baseline",
                           gap: 6,
                           lineHeight: 1.4,
+                          color: "var(--ink)",
                         }}
                       >
-                        <span className="tabular" style={{ color: "var(--muted)", fontSize: 12.5 }}>
+                        <span className="tabular" style={{ color: "var(--muted-light)", fontSize: 12 }}>
                           #{b.claim.id}
                         </span>
                         <span>{b.claim.text}</span>
-                        <ArrowUpRight size={13} color="var(--muted)" style={{ flexShrink: 0 }} />
+                        <ArrowUpRight size={13} color="var(--muted-light)" style={{ flexShrink: 0 }} />
                       </Link>
                       <div
                         style={{
                           fontSize: 12,
-                          color: "var(--muted)",
+                          color: "var(--muted-light)",
                           marginTop: 3,
                           overflow: "hidden",
                           textOverflow: "ellipsis",
@@ -255,13 +282,13 @@ export default function HomePage() {
                       </div>
                     </td>
 
-                    <td style={{ padding: "14px 12px", whiteSpace: "nowrap" }}>
+                    <td style={{ padding: "12px 12px", whiteSpace: "nowrap" }}>
                       <span className="pill" style={{ fontSize: 11.5 }}>
                         {CATEGORY_LABELS[b.claim.category] ?? b.claim.category}
                       </span>
                     </td>
 
-                    <td style={{ padding: "14px 12px", whiteSpace: "nowrap" }}>
+                    <td style={{ padding: "12px 12px", whiteSpace: "nowrap" }}>
                       <span
                         className={`pill ${
                           b.market.status === "Escalated" || b.market.status === "Ruled"
@@ -276,15 +303,39 @@ export default function HomePage() {
 
                     <td
                       className="tabular"
-                      style={{ padding: "14px 12px", textAlign: "right", color: "var(--muted)" }}
+                      style={{ padding: "12px 12px", textAlign: "right", color: "var(--muted)" }}
                     >
                       #{b.market.epoch}
                     </td>
 
-                    <td style={{ padding: "14px 16px", textAlign: "right", whiteSpace: "nowrap" }}>
-                      <span className={`pill tabular ${pillClass}`}>
-                        {formatPct(b.market.yes_price_e6, 1)}
-                      </span>
+                    <td style={{ padding: "12px 16px", textAlign: "right", whiteSpace: "nowrap" }}>
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                        <div
+                          style={{
+                            width: 48,
+                            height: 4,
+                            background: "var(--border)",
+                            borderRadius: 2,
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: `${pctNumber}%`,
+                              height: "100%",
+                              background:
+                                band === "high"
+                                  ? "var(--yes)"
+                                  : band === "low"
+                                  ? "var(--no)"
+                                  : "var(--contested)",
+                            }}
+                          />
+                        </div>
+                        <span className={`pill tabular ${pillClass}`} style={{ minWidth: 54, justifyContent: "center" }}>
+                          {formatPct(b.market.yes_price_e6, 1)}
+                        </span>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -296,4 +347,3 @@ export default function HomePage() {
     </div>
   );
 }
-

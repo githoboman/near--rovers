@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Clock, Gavel, Scale } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Gavel, Scale, ShieldCheck } from "lucide-react";
 import { formatNear, formatPct } from "@/lib/amm";
 import { JuryRulingRecord, MarketView, Outcome, PositionView, Verdict } from "@/lib/types";
 import { usePerpetua } from "@/providers/PerpetuaStore";
@@ -102,7 +102,7 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
     position && (BigInt(position.yes_shares) > 0n || BigInt(position.no_shares) > 0n);
 
   return (
-    <section className="panel" style={{ padding: 20 }}>
+    <section className="panel" style={{ padding: "18px 20px" }}>
       <div
         style={{
           display: "flex",
@@ -112,21 +112,30 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <Gavel size={15} />
-          <h2 style={{ fontSize: 15, fontWeight: 600 }}>Optimistic Escalation</h2>
+          <Gavel size={14} color="var(--accent)" />
+          <h2 style={{ fontSize: 14.5, fontWeight: 600, color: "var(--ink)" }}>Optimistic Escalation</h2>
         </div>
-        <span className="pill" style={{ fontSize: 11.5 }}>
+        <span
+          className={`pill ${
+            market.status === "Escalated" || market.status === "Ruled"
+              ? "pill-contested"
+              : market.status === "Settled"
+              ? "pill-yes"
+              : ""
+          }`}
+          style={{ fontSize: 11 }}
+        >
           {market.status}
         </span>
       </div>
 
-      {/* State machine stepper */}
+      {/* State Machine Stepper */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(4, 1fr)",
           gap: 4,
-          marginBottom: 16,
+          marginBottom: 14,
         }}
       >
         {STEPS.map((step) => {
@@ -136,18 +145,23 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
             <div
               key={step}
               style={{
-                padding: "5px 4px",
+                padding: "4px 2px",
                 textAlign: "center",
-                borderRadius: 6,
-                fontSize: 11.5,
-                fontWeight: active ? 600 : 500,
-                border: "1px solid var(--border)",
+                borderRadius: 4,
+                fontSize: 11,
+                fontWeight: active ? 600 : 400,
+                border: "1px solid",
+                borderColor: active
+                  ? "var(--accent)"
+                  : passed
+                  ? "var(--yes-border)"
+                  : "var(--border)",
                 background: active
-                  ? "var(--ink)"
+                  ? "var(--surface-hover)"
                   : passed
                   ? "var(--yes-bg)"
                   : "var(--surface-muted)",
-                color: active ? "#ffffff" : passed ? "var(--yes)" : "var(--muted)",
+                color: active ? "var(--ink)" : passed ? "var(--yes)" : "var(--muted-light)",
               }}
             >
               {step}
@@ -158,10 +172,10 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
 
       {market.status === "Open" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <p style={{ fontSize: 13, color: "var(--muted)" }}>
-            Dispute the current market confidence ({formatPct(market.yes_price_e6, 1)} YES) by
-            posting a <strong className="tabular" style={{ color: "var(--ink)" }}>{bondFormatted} Ⓝ</strong>{" "}
-            bond. An attested 3-model NEAR AI Cloud jury resolves the epoch.
+          <p style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.45 }}>
+            Dispute current implied confidence ({formatPct(market.yes_price_e6, 1)} YES) by
+            attaching a <strong className="tabular" style={{ color: "var(--ink)" }}>{bondFormatted} Ⓝ</strong> bond.
+            Triggers an attested 3-model TEE jury resolution.
           </p>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
@@ -172,8 +186,9 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
                 className="btn btn-sm"
                 onClick={() => setSide(opt)}
                 style={{
-                  borderColor: side === opt ? "var(--ink)" : "var(--border)",
-                  background: side === opt ? "var(--surface-muted)" : "var(--surface)",
+                  borderColor: side === opt ? "var(--accent)" : "var(--border)",
+                  background: side === opt ? "var(--surface-hover)" : "var(--surface-muted)",
+                  color: side === opt ? "var(--ink)" : "var(--muted)",
                   fontWeight: side === opt ? 600 : 400,
                 }}
               >
@@ -187,11 +202,11 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
             className="btn btn-primary"
             onClick={() => void handleEscalate()}
             disabled={busy}
-            style={{ width: "100%" }}
+            style={{ width: "100%", height: 36 }}
           >
-            <AlertTriangle size={14} />
+            <AlertTriangle size={13} />
             <span>
-              {busy ? "Escalating..." : `Escalate with ${bondFormatted} Ⓝ Bond (${side})`}
+              {busy ? "Escalating on NEAR..." : `Escalate with ${bondFormatted} Ⓝ Bond (${side})`}
             </span>
           </button>
         </div>
@@ -199,7 +214,7 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
 
       {market.status === "Escalated" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <p style={{ fontSize: 13, color: "var(--muted)" }}>
+          <p style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.45 }}>
             Market frozen at{" "}
             <strong className="tabular" style={{ color: "var(--ink)" }}>
               {formatPct(market.snap_yes_price_e6 ?? market.yes_price_e6, 1)} YES
@@ -210,8 +225,8 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
 
           {mode === "demo" ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 600 }}>
-                Simulate NEAR AI Cloud Jury Ruling:
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--muted)" }}>
+                Simulate TEE Jury Consensus Ruling:
               </span>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
                 {(["True", "False", "Unresolved"] as Verdict[]).map((v) => (
@@ -227,9 +242,8 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
               </div>
             </div>
           ) : (
-            <p style={{ fontSize: 12.5, color: "var(--muted)" }}>
-              Waiting for Phase 2 Jury Runner (3+ NEAR AI Cloud TEE models) to call{" "}
-              <code className="tabular">submit_ruling</code>.
+            <p style={{ fontSize: 12, color: "var(--muted-light)" }}>
+              Waiting for offchain TEE jury models (DeepSeek V4.1, Qwen 3.6, GLM 5.3) to submit ruling.
             </p>
           )}
         </div>
@@ -240,36 +254,54 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
           <div
             style={{
               padding: "10px 12px",
-              borderRadius: 7,
+              borderRadius: 6,
               background: "var(--surface-muted)",
-              fontSize: 13,
+              border: "1px solid var(--border)",
+              fontSize: 12.5,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}>
-              <Scale size={14} />
-              <span>Verdict: {market.verdict}</span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}>
+                <Scale size={13} color="var(--accent)" />
+                <span style={{ color: "var(--ink)" }}>Attested Verdict: {market.verdict}</span>
+              </div>
+              <span className="pill pill-contested" style={{ fontSize: 10.5 }}>
+                {windowOpen ? "Challenge Active" : "Finalized"}
+              </span>
             </div>
+
             {market.attestation_hash && (
-              <div className="tabular" style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 4 }}>
+              <div
+                className="tabular"
+                style={{
+                  fontSize: 11,
+                  color: "var(--muted-light)",
+                  marginTop: 4,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
                 Attestation: {market.attestation_hash}
               </div>
             )}
+
             <div
               className="tabular"
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 6,
-                fontSize: 12,
+                gap: 5,
+                fontSize: 11.5,
                 color: windowOpen ? "var(--contested)" : "var(--yes)",
                 marginTop: 6,
               }}
             >
-              <Clock size={12} />
+              <Clock size={11} />
               <span>
                 {windowOpen
-                  ? `Challenge window closes in ${remainingSec}s`
-                  : "Challenge window elapsed — ready to settle"}
+                  ? `Challenge window: ${remainingSec}s remaining`
+                  : "Challenge window elapsed · Ready for settlement"}
               </span>
             </div>
           </div>
@@ -280,9 +312,9 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
               className="btn btn-sm"
               onClick={() => void handleChallengeRuling()}
               disabled={busy}
-              style={{ width: "100%" }}
+              style={{ width: "100%", borderColor: "var(--contested-border)", color: "var(--contested)" }}
             >
-              <AlertTriangle size={13} />
+              <AlertTriangle size={12} />
               <span>
                 Counter-Challenge ({counterSide}) · {counterBondFormatted} Ⓝ (2x Bond)
               </span>
@@ -296,7 +328,7 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
               onClick={() => fastForwardDemoChallengeWindow(claimId)}
               style={{ width: "100%" }}
             >
-              Fast-Forward Demo Challenge Window
+              Fast-Forward Demo Window
             </button>
           )}
 
@@ -305,57 +337,69 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
             className="btn btn-primary"
             onClick={() => void handleSettle()}
             disabled={busy || windowOpen}
-            style={{ width: "100%" }}
+            style={{ width: "100%", height: 36 }}
           >
-            <CheckCircle2 size={14} />
+            <CheckCircle2 size={13} />
             <span>
               {busy
-                ? "Settling..."
+                ? "Settling on NEAR..."
                 : windowOpen
-                ? `Settle locked (${remainingSec}s)`
+                ? `Settle Locked (${remainingSec}s)`
                 : "Settle & Open Next Epoch"}
             </span>
           </button>
         </div>
       )}
 
+      {/* Attested Jury Votes Cards */}
       {ruling && ruling.modelVotes.length > 0 && (
         <div
           style={{
-            marginTop: 14,
-            paddingTop: 14,
+            marginTop: 12,
+            paddingTop: 12,
             borderTop: "1px solid var(--border)",
             display: "flex",
             flexDirection: "column",
-            gap: 8,
+            gap: 6,
           }}
         >
-          <div style={{ fontSize: 12, fontWeight: 600 }}>
-            Attested Jury Votes ({ruling.modelVotes.length} TEE Models)
+          <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--muted)", display: "flex", alignItems: "center", gap: 5 }}>
+            <ShieldCheck size={12} color="var(--yes)" />
+            <span>Attested Jury Votes ({ruling.modelVotes.length} Confidential TEE Models)</span>
           </div>
-          {ruling.modelVotes.map((mv) => (
-            <div
-              key={mv.model}
-              style={{
-                padding: "8px 10px",
-                borderRadius: 6,
-                border: "1px solid var(--border)",
-                fontSize: 12,
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600 }}>
-                <span className="tabular">{mv.model.split("/").pop()}</span>
-                <span className="tabular">
-                  {mv.verdict} (
-                  {mv.confidence <= 1
-                    ? Math.round(mv.confidence * 100)
-                    : Math.round(mv.confidence)}
-                  %)
-                </span>
+          {ruling.modelVotes.map((mv) => {
+            const isTrue = mv.verdict === "True";
+            const isFalse = mv.verdict === "False";
+            return (
+              <div
+                key={mv.model}
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: 5,
+                  background: "var(--surface-muted)",
+                  border: "1px solid var(--border)",
+                  fontSize: 11.5,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span className="tabular" style={{ fontWeight: 600, color: "var(--ink)" }}>
+                    {mv.model.split("/").pop()}
+                  </span>
+                  <span
+                    className={`pill tabular ${
+                      isTrue ? "pill-yes" : isFalse ? "pill-no" : "pill-contested"
+                    }`}
+                    style={{ fontSize: 10.5, height: 18 }}
+                  >
+                    {mv.verdict} ({mv.confidence <= 1 ? Math.round(mv.confidence * 100) : Math.round(mv.confidence)}%)
+                  </span>
+                </div>
+                <p style={{ color: "var(--muted)", marginTop: 4, lineHeight: 1.35, fontSize: 11 }}>
+                  {mv.rationale}
+                </p>
               </div>
-              <p style={{ color: "var(--muted)", marginTop: 3 }}>{mv.rationale}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -363,7 +407,7 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
         <button
           type="button"
           className="btn btn-yes"
-          style={{ width: "100%", marginTop: 12 }}
+          style={{ width: "100%", marginTop: 12, height: 36 }}
           onClick={() => void handleRedeem()}
           disabled={busy}
         >
@@ -371,7 +415,7 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
         </button>
       )}
 
-      {msg && <p style={{ marginTop: 10, fontSize: 12.5, color: "var(--muted)" }}>{msg}</p>}
+      {msg && <p style={{ marginTop: 10, fontSize: 12, color: "var(--muted)" }}>{msg}</p>}
     </section>
   );
 }

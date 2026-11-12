@@ -47,11 +47,18 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
 
   const formatTime = (ms: number) => {
     const d = new Date(ms);
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   };
 
+  // Build area fill polygon for subtle depth
+  const areaPolygon = coords.length > 1
+    ? `${coords[0].x.toFixed(1)},${(padTop + plotH).toFixed(1)} ` +
+      coords.map((c) => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ") +
+      ` ${coords[coords.length - 1].x.toFixed(1)},${(padTop + plotH).toFixed(1)}`
+    : "";
+
   return (
-    <section className="panel" style={{ padding: "20px 24px" }}>
+    <section className="panel" style={{ padding: "18px 22px" }}>
       <div
         style={{
           display: "flex",
@@ -62,9 +69,11 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
         }}
       >
         <div>
-          <h2 style={{ fontSize: 15, fontWeight: 600 }}>Market Implied Confidence (YES)</h2>
-          <p style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>
-            {active.pt.eventLabel ?? "CPMM trade"} · {formatTime(active.pt.timestampMs)}
+          <h2 style={{ fontSize: 14.5, fontWeight: 600, color: "var(--ink)" }}>
+            Continuous Implied Confidence (YES)
+          </h2>
+          <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+            {active.pt.eventLabel ?? "Trade execution"} · {formatTime(active.pt.timestampMs)}
             {active.pt.trader ? ` · ${active.pt.trader}` : ""}
           </p>
         </div>
@@ -79,8 +88,17 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
         role="img"
         aria-label="Market confidence probability history chart"
       >
+        <defs>
+          <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#10b981" stopOpacity="0.16" />
+            <stop offset="100%" stopColor="#10b981" stopOpacity="0.00" />
+          </linearGradient>
+        </defs>
+
+        {/* Faint Horizontal Gridlines */}
         {gridTicks.map((tick) => {
           const y = padTop + (1 - tick / 1_000_000) * plotH;
+          const isMid = tick === 500_000;
           return (
             <g key={tick}>
               <line
@@ -88,16 +106,16 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
                 y1={y}
                 x2={width - padRight}
                 y2={y}
-                stroke={tick === 500_000 ? "#cfcac0" : "#eceae2"}
+                stroke={isMid ? "var(--border-strong)" : "var(--border)"}
                 strokeWidth={1}
-                strokeDasharray={tick === 500_000 ? "3 3" : undefined}
+                strokeDasharray={isMid ? "3 3" : undefined}
               />
               <text
                 x={padLeft - 8}
                 y={y + 4}
                 textAnchor="end"
-                fontSize="11"
-                fill="#5c5f66"
+                fontSize="10.5"
+                fill="var(--muted-light)"
                 style={{ fontFamily: "var(--font-mono)" }}
               >
                 {Math.round(tick / 10_000)}%
@@ -106,24 +124,37 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
           );
         })}
 
+        {/* Bottom baseline */}
         <line
           x1={padLeft}
           y1={padTop + plotH}
           x2={width - padRight}
           y2={padTop + plotH}
-          stroke="#cfcac0"
+          stroke="var(--border-strong)"
           strokeWidth={1}
         />
 
+        {/* Area fill */}
+        {areaPolygon && (
+          <polygon
+            points={areaPolygon}
+            fill="url(#chartGradient)"
+          />
+        )}
+
+        {/* Main curve */}
         {coords.length > 1 && (
           <polyline
             fill="none"
-            stroke="#0f6d4a"
+            stroke="#10b981"
             strokeWidth={2}
+            strokeLinejoin="round"
+            strokeLinecap="round"
             points={polylinePoints}
           />
         )}
 
+        {/* Event points and hover markers */}
         {coords.map((c) => {
           const isEvent = Boolean(c.pt.eventLabel);
           const isActive = c.idx === active.idx;
@@ -134,34 +165,35 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
               onMouseEnter={() => setHoverIdx(c.idx)}
               onMouseLeave={() => setHoverIdx(null)}
             >
-              {isEvent && (
+              {isActive && (
                 <line
                   x1={c.x}
                   y1={padTop}
                   x2={c.x}
                   y2={padTop + plotH}
-                  stroke="#cfcac0"
+                  stroke="var(--accent)"
                   strokeWidth={1}
-                  strokeDasharray="2 3"
+                  strokeDasharray="2 2"
                 />
               )}
               <circle
                 cx={c.x}
                 cy={c.y}
-                r={isActive ? 5 : isEvent ? 3.5 : 2.5}
-                fill={isActive ? "#141517" : "#0f6d4a"}
-                stroke="#ffffff"
+                r={isActive ? 4.5 : isEvent ? 3 : 2}
+                fill={isActive ? "var(--accent)" : "#10b981"}
+                stroke="var(--surface)"
                 strokeWidth={1.5}
               />
             </g>
           );
         })}
 
+        {/* Time bounds */}
         <text
           x={padLeft}
           y={height - 6}
-          fontSize="11"
-          fill="#5c5f66"
+          fontSize="10.5"
+          fill="var(--muted-light)"
           style={{ fontFamily: "var(--font-mono)" }}
         >
           {formatTime(minTs)}
@@ -170,8 +202,8 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
           x={width - padRight}
           y={height - 6}
           textAnchor="end"
-          fontSize="11"
-          fill="#5c5f66"
+          fontSize="10.5"
+          fill="var(--muted-light)"
           style={{ fontFamily: "var(--font-mono)" }}
         >
           {formatTime(maxTs)}
@@ -180,4 +212,3 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
     </section>
   );
 }
-

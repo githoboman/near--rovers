@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Sparkles, Scale, AlertCircle } from "lucide-react";
 import { IntentsDepositPreview } from "@/components/IntentsDepositPreview";
 import { NETWORK_LABEL } from "@/lib/near";
 import { usePerpetua } from "@/providers/PerpetuaStore";
@@ -18,6 +18,11 @@ export default function CreateClaimPage() {
   const [seedNear, setSeedNear] = useState("1.0");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const parsedSeed = useMemo(() => {
+    const val = parseFloat(seedNear);
+    return isNaN(val) || val <= 0 ? 1.0 : val;
+  }, [seedNear]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,27 +49,49 @@ export default function CreateClaimPage() {
   };
 
   return (
-    <div style={{ maxWidth: 680, margin: "0 auto", display: "flex", flexDirection: "column", gap: 18 }}>
+    <div style={{ maxWidth: 680, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
       <Link
         href="/"
-        style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--muted)" }}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          fontSize: 12.5,
+          color: "var(--muted)",
+          transition: "color 0.15s ease",
+        }}
       >
-        <ArrowLeft size={14} />
+        <ArrowLeft size={13} />
         <span>Back to Encyclopedia</span>
       </Link>
 
       <div>
-        <h1 className="serif" style={{ fontSize: 28, fontWeight: 600 }}>
-          Propose a Protocol Claim
+        <h1
+          style={{
+            fontSize: 24,
+            fontWeight: 600,
+            letterSpacing: "-0.015em",
+            color: "var(--ink)",
+          }}
+        >
+          Propose Protocol Fact Claim
         </h1>
-        <p style={{ fontSize: 14, color: "var(--muted)", marginTop: 4 }}>
-          Every claim initializes an epoch-1 constant-product market at 50/50 confidence ({mode === "demo" ? "Demo Ledger" : `NEAR ${NETWORK_LABEL}`}).
+        <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>
+          Initializes an epoch-1 continuous constant-product market at 50/50 equilibrium on NEAR{" "}
+          {mode === "demo" ? "(Demo Ledger)" : `(${NETWORK_LABEL})`}.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="panel" style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
+      <form
+        onSubmit={handleSubmit}
+        className="panel"
+        style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}
+      >
         <div>
-          <label htmlFor="claim-text" style={{ display: "block", fontSize: 13.5, fontWeight: 500, marginBottom: 6 }}>
+          <label
+            htmlFor="claim-text"
+            style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "var(--ink)", marginBottom: 6 }}
+          >
             Factual Claim Statement
           </label>
           <textarea
@@ -75,14 +102,17 @@ export default function CreateClaimPage() {
             className="field-textarea"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="e.g. Protocol X core router passed a formal audit by Trail of Bits prior to v2 launch"
+            placeholder="e.g. Protocol X core router passed a formal security audit by Trail of Bits prior to mainnet launch"
           />
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div>
-            <label htmlFor="claim-cat" style={{ display: "block", fontSize: 13.5, fontWeight: 500, marginBottom: 6 }}>
-              Category
+            <label
+              htmlFor="claim-cat"
+              style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "var(--ink)", marginBottom: 6 }}
+            >
+              Domain Category
             </label>
             <select
               id="claim-cat"
@@ -97,7 +127,10 @@ export default function CreateClaimPage() {
           </div>
 
           <div>
-            <label htmlFor="claim-seed" style={{ display: "block", fontSize: 13.5, fontWeight: 500, marginBottom: 6 }}>
+            <label
+              htmlFor="claim-seed"
+              style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "var(--ink)", marginBottom: 6 }}
+            >
               Initial Seed Liquidity (NEAR)
             </label>
             <input
@@ -112,8 +145,11 @@ export default function CreateClaimPage() {
         </div>
 
         <div>
-          <label htmlFor="claim-epoch" style={{ display: "block", fontSize: 13.5, fontWeight: 500, marginBottom: 6 }}>
-            Epoch Length (hours)
+          <label
+            htmlFor="claim-epoch"
+            style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "var(--ink)", marginBottom: 6 }}
+          >
+            Epoch Resolution Horizon (hours)
           </label>
           <input
             id="claim-epoch"
@@ -127,27 +163,70 @@ export default function CreateClaimPage() {
         </div>
 
         <div>
-          <label htmlFor="claim-uris" style={{ display: "block", fontSize: 13.5, fontWeight: 500, marginBottom: 6 }}>
-            Primary Evidence URIs (one per line)
+          <label
+            htmlFor="claim-uris"
+            style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "var(--ink)", marginBottom: 6 }}
+          >
+            Evidence Citation URIs (one per line)
           </label>
           <textarea
             id="claim-uris"
             rows={3}
             className="field-textarea tabular"
-            style={{ fontSize: 13 }}
+            style={{ fontSize: 12.5 }}
             value={urisRaw}
             onChange={(e) => setUrisRaw(e.target.value)}
           />
         </div>
 
-        {error && <p style={{ fontSize: 13, color: "var(--no)" }}>{error}</p>}
+        {/* Starting Pool Accounting Preview */}
+        <div
+          style={{
+            padding: "10px 14px",
+            borderRadius: 6,
+            background: "var(--surface-muted)",
+            border: "1px solid var(--border)",
+            fontSize: 12,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--muted)" }}>
+            <Scale size={13} color="var(--accent)" />
+            <span>Market Initialization:</span>
+          </div>
+          <span className="tabular" style={{ color: "var(--ink)", fontWeight: 500 }}>
+            YES {(parsedSeed / 2).toFixed(2)} Ⓝ · NO {(parsedSeed / 2).toFixed(2)} Ⓝ · 50.0% Implied
+          </span>
+        </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+        {error && (
+          <div
+            style={{
+              padding: "8px 12px",
+              borderRadius: 6,
+              background: "var(--no-bg)",
+              border: "1px solid var(--no-border)",
+              color: "var(--no)",
+              fontSize: 12.5,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <AlertCircle size={13} />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
           <Link href="/" className="btn">
             Cancel
           </Link>
           <button type="submit" className="btn btn-primary" disabled={submitting || !text.trim()}>
-            {submitting ? "Creating..." : "Create Claim & Seed Market"}
+            <Sparkles size={13} />
+            <span>{submitting ? "Deploying on NEAR..." : "Propose Claim & Seed Market"}</span>
           </button>
         </div>
       </form>
@@ -156,4 +235,3 @@ export default function CreateClaimPage() {
     </div>
   );
 }
-

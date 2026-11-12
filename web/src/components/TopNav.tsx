@@ -19,19 +19,19 @@ export function TopNav() {
       <div className="shell-header-inner">
         <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
           <Link href="/" className="brand-link" aria-label="Perpetua home">
-            {/* Perpetua custom geometric mark: truth balance / twin reserves */}
+            {/* Geometric truth balance mark: continuous confidence cpmm */}
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" strokeWidth="1.75" />
-              <path d="M7 15.5L10.5 11L13.5 13.5L17 8.5" stroke="#0f6d4a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="17" cy="8.5" r="1.5" fill="#0f6d4a" />
+              <rect x="2" y="2" width="20" height="20" rx="4" stroke="currentColor" strokeWidth="1.75" />
+              <path d="M6 16L10 11.5L14 13.5L18 7.5" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="18" cy="7.5" r="1.5" fill="#10b981" />
             </svg>
-            <span>Perpetua</span>
-            <span className="pill" style={{ fontSize: 11, height: 20, color: "var(--muted)" }}>
+            <span style={{ fontWeight: 600, letterSpacing: "-0.015em" }}>Perpetua</span>
+            <span className="pill tabular" style={{ fontSize: 11, height: 20 }}>
               {NETWORK_LABEL}
             </span>
           </Link>
 
-          <nav className="nav-links" aria-label="Primary">
+          <nav className="nav-links" aria-label="Primary navigation">
             <Link
               href="/"
               className={`nav-item ${pathname === "/" ? "active" : ""}`}
@@ -42,7 +42,7 @@ export function TopNav() {
               href="/create"
               className={`nav-item ${pathname === "/create" ? "active" : ""}`}
             >
-              New Claim
+              Propose Claim
             </Link>
           </nav>
         </div>
@@ -55,18 +55,18 @@ export function TopNav() {
             title={
               mode === "demo"
                 ? `Using seeded offline AMM & article simulator; click to query NEAR ${NETWORK_LABEL}`
-                : `Querying ${CONTRACT_ID || `NEAR ${NETWORK_LABEL}`}`
+                : `Querying on-chain contract: ${CONTRACT_ID || `NEAR ${NETWORK_LABEL}`}`
             }
           >
             {mode === "demo" ? (
               <>
-                <FlaskConical size={14} />
+                <FlaskConical size={13} color="var(--contested)" />
                 <span>Demo Ledger</span>
               </>
             ) : (
               <>
-                <Radio size={14} color="#0f6d4a" />
-                <span>Live {NETWORK_LABEL}</span>
+                <Radio size={13} color="var(--yes)" />
+                <span style={{ color: "var(--yes)" }}>Live {NETWORK_LABEL}</span>
               </>
             )}
           </button>
@@ -75,9 +75,18 @@ export function TopNav() {
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span
                 className="pill tabular"
-                style={{ height: 32, padding: "0 10px", background: "var(--surface)" }}
+                style={{
+                  height: 32,
+                  padding: "0 10px",
+                  background: "var(--surface-muted)",
+                  border: "1px solid var(--border-strong)",
+                  color: "var(--ink)",
+                }}
+                title={accountId}
               >
-                {accountId}
+                <span style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {accountId}
+                </span>
                 {balanceYocto ? ` · ${formatNear(balanceYocto, 2)} Ⓝ` : ""}
               </span>
               <button
@@ -87,7 +96,7 @@ export function TopNav() {
                 title="Disconnect wallet"
                 aria-label="Disconnect wallet"
               >
-                <LogOut size={14} />
+                <LogOut size={13} />
               </button>
             </div>
           ) : (
@@ -97,8 +106,8 @@ export function TopNav() {
               onClick={() => void signIn()}
               disabled={connecting}
             >
-              <Wallet size={14} />
-              <span>{connecting ? "Connecting..." : "Connect NEAR Wallet"}</span>
+              <Wallet size={13} />
+              <span>{connecting ? "Connecting..." : "Connect Wallet"}</span>
             </button>
           )}
         </div>
@@ -106,4 +115,3 @@ export function TopNav() {
     </header>
   );
 }
-

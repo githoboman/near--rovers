@@ -2,7 +2,7 @@
 
 import React, { use, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink, Link2, Coins } from "lucide-react";
 import { formatNear, formatPct } from "@/lib/amm";
 import { confidenceBand } from "@/lib/seedClaims";
 import { ConfidenceArticle } from "@/components/ConfidenceArticle";
@@ -56,12 +56,13 @@ export default function ClaimDetailPage({
             display: "inline-flex",
             alignItems: "center",
             gap: 6,
-            fontSize: 13,
+            fontSize: 12.5,
             color: "var(--muted)",
             marginBottom: 10,
+            transition: "color 0.15s ease",
           }}
         >
-          <ArrowLeft size={14} />
+          <ArrowLeft size={13} />
           <span>All Claims</span>
         </Link>
 
@@ -74,26 +75,32 @@ export default function ClaimDetailPage({
             gap: 16,
           }}
         >
-          <div style={{ maxWidth: 820 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <span className="pill tabular" style={{ fontSize: 11.5 }}>
+          <div style={{ maxWidth: 840 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+              <span className="pill tabular" style={{ fontSize: 11 }}>
                 Claim #{claim.id}
               </span>
-              <span className="pill" style={{ fontSize: 11.5 }}>
+              <span className="pill" style={{ fontSize: 11 }}>
                 {claim.category}
               </span>
-              <span className="pill" style={{ fontSize: 11.5 }}>
+              <span className="pill tabular" style={{ fontSize: 11 }}>
                 Epoch #{market.epoch} · {market.status}
               </span>
             </div>
             <h1
-              className="serif"
-              style={{ fontSize: 28, fontWeight: 600, lineHeight: 1.25, letterSpacing: "-0.015em" }}
+              style={{
+                fontSize: 24,
+                fontWeight: 600,
+                lineHeight: 1.3,
+                letterSpacing: "-0.015em",
+                color: "var(--ink)",
+              }}
             >
               {claim.text}
             </h1>
           </div>
 
+          {/* Prominent Confidence Badge */}
           <div
             className="panel"
             style={{
@@ -104,13 +111,15 @@ export default function ClaimDetailPage({
             }}
           >
             <div>
-              <div style={{ fontSize: 11.5, color: "var(--muted)" }}>Market Confidence</div>
-              <div className="tabular" style={{ fontSize: 26, fontWeight: 600, lineHeight: 1.2 }}>
+              <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>
+                Implied Confidence
+              </div>
+              <div className="tabular" style={{ fontSize: 24, fontWeight: 600, lineHeight: 1.2, color: "var(--ink)" }}>
                 {formatPct(market.yes_price_e6, 1)}
               </div>
             </div>
-            <span className={`pill ${pillClass}`}>
-              {band === "high" ? "Supported" : band === "low" ? "Disputed / Low" : "Contested"}
+            <span className={`pill ${pillClass}`} style={{ fontWeight: 600 }}>
+              {band === "high" ? "Supported" : band === "low" ? "Disputed" : "Contested"}
             </span>
           </div>
         </div>
@@ -119,56 +128,69 @@ export default function ClaimDetailPage({
       {/* Main 2-column workspace */}
       <div className="claim-grid">
         {/* Left: AI Article, Chart, Reserves & Evidence */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           <ConfidenceArticle article={article} onChainPageHash={claim.page_hash} />
 
           <PriceHistoryChart points={history} />
 
-          {/* Market Mechanics & Cited Evidence */}
-          <section className="panel" style={{ padding: "20px 24px" }}>
-            <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>
-              Evidence & Pool Accounting
-            </h2>
+          {/* Market Reserves & Cited Evidence */}
+          <section className="panel" style={{ padding: "18px 22px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                marginBottom: 12,
+              }}
+            >
+              <Coins size={14} color="var(--accent)" />
+              <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>
+                Pool Accounting & Solvency Reserves
+              </h2>
+            </div>
 
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-                gap: 12,
-                paddingBottom: 16,
-                marginBottom: 16,
+                gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+                gap: 10,
+                paddingBottom: 14,
+                marginBottom: 14,
                 borderBottom: "1px solid var(--border)",
               }}
             >
-              <div>
-                <div style={{ fontSize: 12, color: "var(--muted)" }}>YES Reserve</div>
-                <div className="tabular" style={{ fontSize: 15, fontWeight: 600 }}>
+              <div style={{ padding: "8px 10px", borderRadius: 5, background: "var(--surface-muted)" }}>
+                <div style={{ fontSize: 11, color: "var(--muted)" }}>YES Reserve</div>
+                <div className="tabular" style={{ fontSize: 14, fontWeight: 600, marginTop: 2, color: "var(--yes)" }}>
                   {formatNear(market.yes_reserve, 3)} Ⓝ
                 </div>
               </div>
-              <div>
-                <div style={{ fontSize: 12, color: "var(--muted)" }}>NO Reserve</div>
-                <div className="tabular" style={{ fontSize: 15, fontWeight: 600 }}>
+              <div style={{ padding: "8px 10px", borderRadius: 5, background: "var(--surface-muted)" }}>
+                <div style={{ fontSize: 11, color: "var(--muted)" }}>NO Reserve</div>
+                <div className="tabular" style={{ fontSize: 14, fontWeight: 600, marginTop: 2, color: "var(--no)" }}>
                   {formatNear(market.no_reserve, 3)} Ⓝ
                 </div>
               </div>
-              <div>
-                <div style={{ fontSize: 12, color: "var(--muted)" }}>Collateral Vault</div>
-                <div className="tabular" style={{ fontSize: 15, fontWeight: 600 }}>
+              <div style={{ padding: "8px 10px", borderRadius: 5, background: "var(--surface-muted)" }}>
+                <div style={{ fontSize: 11, color: "var(--muted)" }}>Collateral Vault</div>
+                <div className="tabular" style={{ fontSize: 14, fontWeight: 600, marginTop: 2, color: "var(--ink)" }}>
                   {formatNear(market.collateral_vault, 3)} Ⓝ
                 </div>
               </div>
-              <div>
-                <div style={{ fontSize: 12, color: "var(--muted)" }}>Fee Pool</div>
-                <div className="tabular" style={{ fontSize: 15, fontWeight: 600 }}>
+              <div style={{ padding: "8px 10px", borderRadius: 5, background: "var(--surface-muted)" }}>
+                <div style={{ fontSize: 11, color: "var(--muted)" }}>Fee Pool</div>
+                <div className="tabular" style={{ fontSize: 14, fontWeight: 600, marginTop: 2, color: "var(--contested)" }}>
                   {formatNear(market.fee_pool, 4)} Ⓝ
                 </div>
               </div>
             </div>
 
-            <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 8 }}>Cited Evidence</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, marginBottom: 8, color: "var(--ink)" }}>
+              <Link2 size={13} color="var(--muted)" />
+              <span>Cited Source Evidence</span>
+            </div>
             {claim.evidence_uris.length === 0 ? (
-              <p style={{ fontSize: 13, color: "var(--muted)" }}>No evidence URIs attached.</p>
+              <p style={{ fontSize: 12.5, color: "var(--muted)" }}>No external evidence URIs attached.</p>
             ) : (
               <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
                 {claim.evidence_uris.map((uri) => (
@@ -181,14 +203,13 @@ export default function ClaimDetailPage({
                         display: "inline-flex",
                         alignItems: "center",
                         gap: 6,
-                        fontSize: 13,
-                        color: "var(--ink)",
-                        textDecoration: "underline",
-                        textUnderlineOffset: 3,
+                        fontSize: 12.5,
+                        color: "var(--accent)",
+                        wordBreak: "break-all",
                       }}
                     >
                       <span>{uri}</span>
-                      <ExternalLink size={12} />
+                      <ExternalLink size={12} style={{ flexShrink: 0 }} />
                     </a>
                   </li>
                 ))}
@@ -198,7 +219,7 @@ export default function ClaimDetailPage({
         </div>
 
         {/* Right Rail: Trade + Escalation/Jury */}
-        <aside style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <aside style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <TradeWidget claimId={claim.id} market={market} position={positions[claim.id]} />
           <EscalatePanel
             claimId={claim.id}
@@ -211,4 +232,3 @@ export default function ClaimDetailPage({
     </div>
   );
 }
-
