@@ -115,6 +115,7 @@ export interface JuryRulingRecord {
   id?: number;
   claim_id: number;
   epoch: number;
+  ruling_round?: number;
   verdict: Verdict;
   supermajority_count: number;
   total_models: number;

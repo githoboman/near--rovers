@@ -396,5 +396,56 @@ mod tests {
     fn default_bond_constant_matches_spec() {
         assert_eq!(DEFAULT_ESCALATION_BOND, millinear(500).as_yoctonear());
     }
+
+    #[test]
+    #[should_panic(expected = "epoch_length out of allowed range")]
+    fn rejects_excessive_epoch_length_overflow_bomb() {
+        let mut c = setup_contract();
+        set_ctx("attacker.testnet", near(2), 1_000_000_000);
+        let _ = c.create_claim(
+            "Overflow time-bomb claim".to_string(),
+            vec![],
+            "audit_status".to_string(),
+            (u64::MAX - 2_000_000_000).into(),
+        );
+    }
+
+    #[test]
+    fn counter_challenge_clears_stale_attestation_and_pagination_works() {
+        let mut c = setup_contract();
+        set_ctx("alice.testnet", near(2), 1_000_000_000);
+        let id1 = c.create_claim(
+            "Claim one".to_string(),
+            vec![],
+            "audit_status".to_string(),
+            60_000_000_000u64.into(),
+        );
+        let id2 = c.create_claim(
+            "Claim two".to_string(),
+            vec![],
+            "tvl".to_string(),
+            60_000_000_000u64.into(),
+        );
+        assert_eq!(c.get_claims(0, 1).len(), 1);
+        assert_eq!(c.get_claims(1, 5)[0].id, id2);
+
+        set_ctx("dave.testnet", near(2), 2_000_000_000);
+        c.escalate(id1, Some(Outcome::Yes));
+        set_ctx("resolver.testnet", NearToken::from_yoctonear(0), 3_000_000_000);
+        c.submit_ruling(id1, Verdict::False, "att_initial".to_string());
+        set_ctx("erin.testnet", near(3), 4_000_000_000);
+        c.challenge_ruling(id1, Some(Outcome::Yes));
+        let m_re = c.get_market(id1, Some(1)).unwrap();
+        assert_eq!(m_re.status, MarketStatus::Escalated);
+        assert!(m_re.attestation_hash.is_none());
+
+        // Owner governance rotation & config bounds work
+        set_ctx("owner.testnet", NearToken::from_yoctonear(0), 5_000_000_000);
+        c.update_config(Some(150), Some(millinear(750).as_yoctonear().into()), Some(60_000_000_000u64.into()));
+        c.set_owner(acc("dao.near"));
+        let cfg = c.get_config();
+        assert_eq!(cfg.owner_id, acc("dao.near"));
+        assert_eq!(cfg.fee_bps, 150);
+    }
 }
 

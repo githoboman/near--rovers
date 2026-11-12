@@ -202,12 +202,44 @@ impl Contract {
 
     // ---- Admin & Governance ----
 
+    pub fn set_owner(&mut self, new_owner: AccountId) {
+        require!(
+            env::predecessor_account_id() == self.owner_id,
+            "Only owner can transfer ownership"
+        );
+        self.owner_id = new_owner;
+    }
+
     pub fn set_resolver(&mut self, new_resolver: AccountId) {
         require!(
             env::predecessor_account_id() == self.owner_id,
             "Only owner can update resolver"
         );
         self.resolver_account_id = new_resolver;
+    }
+
+    pub fn update_config(
+        &mut self,
+        fee_bps: Option<u16>,
+        escalation_bond: Option<U128>,
+        challenge_window_ns: Option<U64>,
+    ) {
+        require!(
+            env::predecessor_account_id() == self.owner_id,
+            "Only owner can update config"
+        );
+        if let Some(fee) = fee_bps {
+            require!(fee <= MAX_FEE_BPS, "fee_bps exceeds MAX_FEE_BPS");
+            self.fee_bps = fee;
+        }
+        if let Some(bond) = escalation_bond {
+            require!(bond.0 > 0, "escalation_bond must be positive");
+            self.escalation_bond = bond.0;
+        }
+        if let Some(window) = challenge_window_ns {
+            require!(window.0 > 0, "challenge_window_ns must be positive");
+            self.challenge_window_ns = window.0;
+        }
     }
 
     pub fn withdraw_jury_fund(&mut self, to: AccountId, amount: U128) -> Promise {

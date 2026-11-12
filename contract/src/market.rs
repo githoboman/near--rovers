@@ -7,9 +7,9 @@ use crate::collateral::CollateralAdapter;
 use crate::events::PerpetuaEvent;
 use crate::types::{
     BPS_DENOMINATOR, CHALLENGER_REWARD_BPS, Claim, ClaimStatus, ClaimView, MAX_CATEGORY_LEN,
-    MAX_CLAIM_TEXT_LEN, MAX_EVIDENCE_URIS, MAX_HASH_LEN, MAX_URI_LEN, MIN_SEED_LIQUIDITY, Market,
-    MarketStatus, MarketView, Outcome, PRICE_SCALE, Position, PositionView, PriceQuote,
-    QuoteBuyResult, QuoteSellResult, Verdict,
+    MAX_CLAIM_TEXT_LEN, MAX_EPOCH_LENGTH_NS, MAX_EVIDENCE_URIS, MAX_HASH_LEN, MAX_URI_LEN,
+    MIN_EPOCH_LENGTH_NS, MIN_SEED_LIQUIDITY, Market, MarketStatus, MarketView, Outcome,
+    PRICE_SCALE, Position, PositionView, PriceQuote, QuoteBuyResult, QuoteSellResult, Verdict,
 };
 
 pub fn encode_hex(bytes: &[u8]) -> String {
@@ -147,7 +147,10 @@ impl Contract {
                 "Invalid evidence URI length"
             );
         }
-        require!(epoch_length > 0, "epoch_length must be positive");
+        require!(
+            (MIN_EPOCH_LENGTH_NS..=MAX_EPOCH_LENGTH_NS).contains(&epoch_length),
+            "epoch_length out of allowed range"
+        );
 
         let storage_before = env::storage_usage();
         let claim_id = self.next_claim_id;
@@ -604,6 +607,7 @@ impl Contract {
         market.counter_bond = min_counter_bond;
         market.status = MarketStatus::Escalated;
         market.verdict = None;
+        market.attestation_hash = None;
         market.ruled_at = None;
         market.challenge_deadline = None;
 
@@ -1050,12 +1054,15 @@ impl Contract {
     }
 
     pub(crate) fn get_claims_internal(&self, from_index: u64, limit: u64) -> Vec<ClaimView> {
-        self.claims
-            .values()
-            .skip(from_index as usize)
-            .take(limit as usize)
-            .map(ClaimView::from)
-            .collect()
+        let start_id = 1u64.saturating_add(from_index);
+        let end_id = start_id.saturating_add(limit).min(self.next_claim_id);
+        let mut out = Vec::new();
+        for id in start_id..end_id {
+            if let Some(claim) = self.claims.get(&id) {
+                out.push(ClaimView::from(claim));
+            }
+        }
+        out
     }
 
     pub(crate) fn get_market_internal(

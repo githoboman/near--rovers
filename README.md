@@ -81,8 +81,8 @@ cd workspaces-tests && cargo test
 
 Verified locally:
 
-- `cargo test --lib`: **11 passed, 0 failed** (`1.90s`).
-- `RUSTFLAGS="--cfg near" cargo build --target wasm32-unknown-unknown --release`: compiled `perpetua_contract.wasm` (**301,954 bytes** with `strip = "symbols"`, reduced to **249,670 bytes** via `wasm-opt -Oz` for deployment).
+- `cargo test --lib`: **13 passed, 0 failed** (`2.41s`).
+- `RUSTFLAGS="--cfg near" cargo build --target wasm32-unknown-unknown --release`: compiled `perpetua_contract.wasm` (**305,707 bytes** with `strip = "symbols"` and opt-level = "z").
 
 ---
 
@@ -155,6 +155,73 @@ Verified locally:
   3. `escalate` (`0.05 NEAR` bond + refundable storage buffer) -> **3/3 TEE-verified models** rendered `Unresolved` verdict (`attestation_hash=6e2a6178...`) -> `submit_ruling` -> `market_status=Ruled`.
   4. Waited 15s challenge window -> `settle` finalized Epoch 1 (`Settled`) and opened **Epoch 2** -> `redeem(4, 1)` redeemed both sides down to `(YES: 0, NO: 0)`.
 - **Live HTTP & Intents Check:** Verified `services` (`GET /health`, `GET /api/claims` returning `total: 24`, `GET /api/claims/4`, `GET /api/intents/tokens`, `POST /api/intents/quote` returning a live `dry=true` quote from `1click.chaindefuser.com`).
+
+---
+
+## Pre-Mainnet Hardening & Security Audit Fixes
+
+A comprehensive multi-vector code audit was conducted across smart contract, offchain services, and frontend before Mainnet readiness:
+
+| Layer | Component | Finding & Vulnerability | Remediation Applied |
+| :--- | :--- | :--- | :--- |
+| **Contract** | `market.rs` | Unbounded `epoch_length` could cause `u64` overflow in `opened_at + epoch_length`. | Added `MIN_EPOCH_LENGTH_NS` (10s) and `MAX_EPOCH_LENGTH_NS` (10 years) validation bounds in `create_claim_internal`. |
+| **Contract** | `market.rs` | `challenge_ruling_internal` retained previous ruling's `attestation_hash`. | Reset `market.attestation_hash = None` upon counter-challenge to ensure clean state for re-ruling. |
+| **Contract** | `market.rs` | Linear $O(N)$ key skip in `get_claims` pagination. | Replaced with $O(\text{limit})$ indexed key scan `start_id..end_id`. |
+| **Contract** | `collateral.rs` | Direct `Promise::new(recipient).transfer()` in `refund_excess` could lock funds if caller smart contract rejects receipt. | Routed `refund_excess` through `Self::transfer_with_callback` with `claimable_refunds` fallback. |
+| **Contract** | `lib.rs` | Immutable contract parameters prevented governance parameter updates. | Added `set_owner(new_owner)` and `update_config(fee_bps, escalation_bond, challenge_window_ns)` restricted to `owner_id`. |
+| **Services** | `jury/index.ts` | SSRF / IP spoofing via malicious evidence URLs pointing to localhost or private cloud metadata. | Implemented strict DNS pre-resolution rejecting loopback, RFC1918/CGNAT/link-local/multicast IPs and non-HTTPS targets with a 64KB bounded stream reader. |
+| **Services** | `jury/index.ts` | AI prompt injection via crafted claim texts or scraped evidence. | Escaped and wrapped untrusted strings within delimited `<UNTRUSTED_CLAIM>` and `<UNTRUSTED_EVIDENCE>` XML tags with strict system prompt anti-hijacking rules. |
+| **Services** | `jury/index.ts` | Invalid/unverified model signatures could be tallied. | Filtered out unverified model outputs (counted as Abstain) and mandated `provider_tee` verification on Mainnet. |
+| **Services** | `db/index.ts` | Unique constraint conflict on counter-challenge rulings (`claim_id, epoch`). | Added `ruling_round` column and migration (`idx_jury_rulings_claim_epoch_round`) to track multi-round dispute histories. |
+| **Services** | `amm.ts` | Offchain trading fee calculation rounded down, diverging from on-chain ceiling rounding. | Switched to `divCeil(collateralIn * BigInt(feeBps), BPS_DENOM)` and added `MIN_RESERVE` guards to ensure exact integer parity. |
+| **Services** | `nearAiClient.ts` | Unbounded HTTP connections could hang jury processes during network latency. | Added `AbortSignal.timeout` (10s on attestation/signatures, 35s on chat completions). |
+| **Services** | `server.ts` | Unauthenticated public endpoints susceptible to sync spam. | Added optional `ADMIN_API_TOKEN` bearer auth and a 3-second cooldown on `POST /api/claims/:id/sync`. |
+| **Frontend** | `near.ts` & `TopNav` | Hardcoded `"testnet"` network references in UI elements and RPC defaults. | Generalized to dynamic `NEXT_PUBLIC_NEAR_NETWORK` (`testnet` / `mainnet`), auto-selecting `rpc.mainnet.fastnear.com` on Mainnet. |
+| **Frontend** | `PerpetuaStore.tsx` | String `.split(".")` decimal arithmetic risks precision errors on irregular inputs. | Replaced with strict `parseNearToYocto` integer multiplier math. |
+| **Frontend** | `EscalatePanel.tsx` | Missing UI workflow for counter-challenging a disputed ruling. | Added one-click Counter-Challenge button with dynamic 2x bond calculation during active challenge windows. |
+
+---
+
+## Mainnet Deployment Checklist & Runbook
+
+When deploying Perpetua to NEAR Mainnet:
+
+1. **Prerequisites:**
+   - A funded NEAR Mainnet account (e.g. `perpetua.near` or a 64-char implicit account) with at least 15-20 NEAR for contract storage and initial liquidity seeding.
+   - NEAR AI Cloud API key with TEE compute credits.
+2. **Configuration (`.env` & `web/.env.local`):**
+   ```bash
+   NEAR_NETWORK=mainnet
+   NEAR_RPC_URL=https://rpc.mainnet.fastnear.com
+   NEAR_CONTRACT_ID=<your-mainnet-account.near>
+   NEAR_RESOLVER_ACCOUNT_ID=<your-mainnet-account.near>
+   NEAR_RESOLVER_PRIVATE_KEY=ed25519:<your-mainnet-private-key>
+   NEAR_AI_API_KEY=sk-...
+   ALLOW_UNVERIFIED_FALLBACK=false
+   ADMIN_API_TOKEN=<random-secure-secret>
+   NEXT_PUBLIC_NEAR_NETWORK=mainnet
+   NEXT_PUBLIC_NEAR_CONTRACT_ID=<your-mainnet-account.near>
+   ```
+3. **Compile & Deploy Contract:**
+   ```bash
+   # Recompile stripped release WASM
+   cd contract && RUSTFLAGS="--cfg near" cargo build --target wasm32-unknown-unknown --release
+
+   # Deploy and initialize contract via Node script
+   cd ../services && npx tsx src/scripts/deploy-testnet.ts
+   ```
+4. **Seed Initial Production Claims:**
+   ```bash
+   cd services && npx tsx src/scripts/seed-claims.ts
+   ```
+5. **Start Production Services & Web Application:**
+   ```bash
+   # Start background indexer, AI jury, and API
+   cd services && pnpm start
+
+   # Start frontend (or deploy to Vercel)
+   cd web && pnpm build && pnpm start
+   ```
 
 ---
 

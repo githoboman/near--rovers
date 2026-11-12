@@ -1,12 +1,13 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { PRICE_SCALE, quoteBuy, quoteSell, YOCTO_PER_NEAR } from "@/lib/amm";
+import { parseNearToYocto, PRICE_SCALE, quoteBuy, quoteSell, YOCTO_PER_NEAR } from "@/lib/amm";
 import {
   CONTRACT_ID,
   ESCALATE_STORAGE_BUFFER_YOCTO,
   SERVICES_URL,
   buildBuyTx,
+  buildChallengeRulingTx,
   buildCreateClaimTx,
   buildEscalateTx,
   buildRedeemTx,
@@ -59,6 +60,7 @@ interface PerpetuaContextValue {
   executeBuy: (claimId: number, outcome: Outcome, amountNear: string) => Promise<void>;
   executeSell: (claimId: number, outcome: Outcome, sharesYocto: string) => Promise<void>;
   executeEscalate: (claimId: number, assertedOutcome?: Outcome) => Promise<void>;
+  executeChallengeRuling: (claimId: number, assertedOutcome?: Outcome) => Promise<void>;
   executeCreateClaim: (input: {
     text: string;
     evidenceUris: string[];
@@ -220,11 +222,8 @@ export function PerpetuaProvider({ children }: { children: React.ReactNode }) {
       const target = bundles.find((b) => b.claim.id === claimId);
       if (!target) throw new Error("Claim not found");
 
-      const parts = amountNear.trim().split(".");
-      const whole = BigInt(parts[0] || "0");
-      const frac = BigInt((parts[1] || "").slice(0, 24).padEnd(24, "0"));
-      const depositYocto = whole * YOCTO_PER_NEAR + frac;
-      if (depositYocto <= 0n) throw new Error("Amount must be greater than zero");
+      const depositYocto = parseNearToYocto(amountNear);
+      if (depositYocto <= 0n) throw new Error("Enter a valid positive NEAR amount");
 
       const q = quoteBuy(
         BigInt(target.market.yes_reserve),
@@ -469,6 +468,62 @@ export function PerpetuaProvider({ children }: { children: React.ReactNode }) {
     [config.escalation_bond, mode, callMethod, loadFromServicesOrChain, refreshClaim, accountId]
   );
 
+  const executeChallengeRuling = useCallback(
+    async (claimId: number, assertedOutcome?: Outcome) => {
+      setLastError(null);
+      const minCounterBond = BigInt(config.escalation_bond) * 2n;
+      const bondWithStorage = (minCounterBond + ESCALATE_STORAGE_BUFFER_YOCTO).toString();
+      if (mode === "live" && isLiveContractConfigured()) {
+        await callMethod(
+          buildChallengeRulingTx({
+            claimId,
+            assertedOutcome,
+            bondYocto: bondWithStorage,
+          })
+        );
+        await loadFromServicesOrChain();
+        await refreshClaim(claimId);
+        return;
+      }
+
+      setBundles((prev) =>
+        prev.map((b) => {
+          if (b.claim.id !== claimId || b.market.status !== "Ruled") return b;
+          const fallbackSide: Outcome =
+            b.market.verdict === "True" ? "No" : "Yes";
+          const side = assertedOutcome ?? fallbackSide;
+          const nextMarket: MarketView = {
+            ...b.market,
+            status: "Escalated",
+            counter_challenger: accountId || "counter-challenger.testnet",
+            counter_side: side,
+            counter_bond: minCounterBond.toString(),
+            verdict: null,
+            attestation_hash: null,
+            ruled_at: null,
+            challenge_deadline: null,
+          };
+          const nextClaim: ClaimView = { ...b.claim, status: "Escalated" };
+          return {
+            ...b,
+            claim: nextClaim,
+            market: nextMarket,
+            article: synthesizeArticleFromMarket(nextClaim, nextMarket, null),
+            history: [
+              ...b.history,
+              {
+                timestampMs: Date.now(),
+                yesPriceE6: b.market.yes_price_e6,
+                eventLabel: `Counter-challenged (${side})`,
+              },
+            ],
+          };
+        })
+      );
+    },
+    [config.escalation_bond, mode, callMethod, loadFromServicesOrChain, refreshClaim, accountId]
+  );
+
   const runDemoJuryFlow = useCallback(
     (claimId: number, verdict: Verdict) => {
       setBundles((prev) =>
@@ -663,10 +718,8 @@ export function PerpetuaProvider({ children }: { children: React.ReactNode }) {
       epochHours: number;
       seedNear: string;
     }) => {
-      const parts = input.seedNear.trim().split(".");
-      const whole = BigInt(parts[0] || "0");
-      const frac = BigInt((parts[1] || "").slice(0, 24).padEnd(24, "0"));
-      const seedYocto = whole * YOCTO_PER_NEAR + frac;
+      const seedYocto = parseNearToYocto(input.seedNear);
+      if (seedYocto <= 0n) throw new Error("Enter a valid positive seed NEAR amount");
       const epochLengthNs = (BigInt(Math.max(1, input.epochHours)) * 3600n * 1_000_000_000n).toString();
 
       if (mode === "live" && isLiveContractConfigured()) {
@@ -680,7 +733,7 @@ export function PerpetuaProvider({ children }: { children: React.ReactNode }) {
           })
         );
         await loadFromServicesOrChain();
-        return bundles.length + 1;
+        return await fetchOnChainClaimsCount().catch(() => bundles.length + 1);
       }
 
       const nextId = bundles.reduce((m, b) => Math.max(m, b.claim.id), 0) + 1;
@@ -760,6 +813,7 @@ export function PerpetuaProvider({ children }: { children: React.ReactNode }) {
         executeBuy,
         executeSell,
         executeEscalate,
+        executeChallengeRuling,
         executeCreateClaim,
         runDemoJuryFlow,
         fastForwardDemoChallengeWindow,

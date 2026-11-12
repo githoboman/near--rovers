@@ -8,7 +8,12 @@ import type { PerpetuaServiceConfig } from "../src/config.ts";
 import { PerpetuaDatabase } from "../src/db/index.ts";
 import { PageGeneratorService } from "../src/generator/index.ts";
 import { OneClickIntentsClient } from "../src/intents/oneClick.ts";
-import { isPublicHttpsUrl, JuryService, tallySupermajority } from "../src/jury/index.ts";
+import {
+  isPrivateOrReservedIp,
+  isPublicHttpsUrl,
+  JuryService,
+  tallySupermajority,
+} from "../src/jury/index.ts";
 import type { PerpetuaNearClient } from "../src/near/client.ts";
 import type { ClaimView, MarketView } from "../src/types.ts";
 
@@ -87,6 +92,7 @@ function baseConfig(): PerpetuaServiceConfig {
     autoGeneratePages: true,
     allowUnverifiedFallback: false,
     corsOrigin: "*",
+    adminApiToken: "",
   };
 }
 
@@ -114,6 +120,10 @@ describe("AMM integer parity", () => {
     const sell = quoteSell(buy.newYes, buy.newNo, "Yes", buy.sharesOut / 2n, 100);
     assert.ok(sell.netCollateralOut > 0n);
     assert.ok(sell.netCollateralOut < sell.grossCollateralOut);
+
+    // Fee ceiling parity with contract::amm::mul_div_ceil (101 yocto * 100 bps -> fee = 2)
+    const ceilFeeBuy = quoteBuy(YOCTO_PER_NEAR, YOCTO_PER_NEAR, "Yes", 101n, 100);
+    assert.equal(ceilFeeBuy.fee, 2n);
   });
 });
 
@@ -163,6 +173,47 @@ describe("SQLite DB persistence & price deduplication", () => {
     });
     assert.equal(moved, true);
     assert.equal(db.getPriceHistory(1, 1).length, 2);
+
+    // Round 1 + Round 2 (counter-challenge) rulings coexist in same epoch
+    db.saveJuryRuling({
+      claim_id: 1,
+      epoch: 1,
+      ruling_round: 1,
+      verdict: "False",
+      supermajority_count: 2,
+      total_models: 3,
+      required_majority: 2,
+      evidence_packet_json: "{}",
+      evidence_hash: "h1",
+      attestation_bundle_json: "{}",
+      attestation_hash: "a1",
+      submitted_tx_hash: "tx1",
+      mode: "near-ai-cloud-tee",
+      created_at: 1000,
+      votes: [],
+    });
+    assert.equal(db.getJuryRuling(1, 1, 2), null);
+    db.saveJuryRuling({
+      claim_id: 1,
+      epoch: 1,
+      ruling_round: 2,
+      verdict: "True",
+      supermajority_count: 3,
+      total_models: 3,
+      required_majority: 2,
+      evidence_packet_json: "{}",
+      evidence_hash: "h2",
+      attestation_bundle_json: "{}",
+      attestation_hash: "a2",
+      submitted_tx_hash: "tx2",
+      mode: "near-ai-cloud-tee",
+      created_at: 2000,
+      votes: [],
+    });
+    assert.equal(db.getJuryRuling(1, 1, 1)?.verdict, "False");
+    assert.equal(db.getJuryRuling(1, 1, 2)?.verdict, "True");
+    assert.equal(db.getJuryRuling(1, 1)?.verdict, "True");
+
     db.close();
   });
 });
@@ -208,8 +259,15 @@ describe("Jury supermajority tally", () => {
     assert.equal(isPublicHttpsUrl("http://github.com/Uniswap/v3-core"), false);
     assert.equal(isPublicHttpsUrl("https://localhost:3001/secret"), false);
     assert.equal(isPublicHttpsUrl("https://127.0.0.1/admin"), false);
+    assert.equal(isPublicHttpsUrl("https://[::1]/admin"), false);
+    assert.equal(isPublicHttpsUrl("https://[::ffff:127.0.0.1]/admin"), false);
+    assert.equal(isPublicHttpsUrl("https://2130706433/admin"), false);
+    assert.equal(isPublicHttpsUrl("https://0x7f000001/admin"), false);
     assert.equal(isPublicHttpsUrl("https://192.168.1.10/status"), false);
     assert.equal(isPublicHttpsUrl("https://169.254.169.254/latest/meta-data"), false);
+    assert.equal(isPrivateOrReservedIp("100.64.0.1"), true);
+    assert.equal(isPrivateOrReservedIp("fe80::1"), true);
+    assert.equal(isPrivateOrReservedIp("1.1.1.1"), false);
   });
 });
 

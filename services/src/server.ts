@@ -121,13 +121,15 @@ export function createPerpetuaServer(opts: {
 }): http.Server {
   const { config, db, orchestrator } = opts;
   const oneClick = new OneClickIntentsClient(config);
+  let lastManualSyncMs = 0;
+  const SYNC_COOLDOWN_MS = 3000;
 
   return http.createServer(async (req, res) => {
     if (req.method === "OPTIONS") {
       res.writeHead(204, {
         "Access-Control-Allow-Origin": config.corsOrigin,
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
       });
       res.end();
       return;
@@ -199,6 +201,24 @@ export function createPerpetuaServer(opts: {
 
       const syncMatch = pathname.match(/^\/api\/claims\/(\d+)\/sync$/);
       if (req.method === "POST" && syncMatch) {
+        if (config.adminApiToken) {
+          const authHeader = req.headers.authorization || "";
+          if (authHeader !== `Bearer ${config.adminApiToken}`) {
+            sendJson(res, 401, { error: "Unauthorized" }, config.corsOrigin);
+            return;
+          }
+        }
+        const now = Date.now();
+        if (now - lastManualSyncMs < SYNC_COOLDOWN_MS) {
+          sendJson(
+            res,
+            429,
+            { error: "Sync cooldown active; try again in a few seconds" },
+            config.corsOrigin,
+          );
+          return;
+        }
+        lastManualSyncMs = now;
         await readJsonBody(req).catch(() => ({}));
         if (!orchestrator) {
           sendJson(res, 503, { error: "Orchestrator unavailable" }, config.corsOrigin);
@@ -247,6 +267,7 @@ export function createPerpetuaServer(opts: {
             typeof body.slippageTolerance === "number"
               ? body.slippageTolerance
               : undefined,
+          dry: typeof body.dry === "boolean" ? body.dry : undefined,
         });
         sendJson(res, 200, quote, config.corsOrigin);
         return;

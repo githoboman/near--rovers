@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { IntentsDepositPreview } from "@/components/IntentsDepositPreview";
+import { NETWORK_LABEL } from "@/lib/near";
 import { usePerpetua } from "@/providers/PerpetuaStore";
 
 export default function CreateClaimPage() {
@@ -57,7 +58,7 @@ export default function CreateClaimPage() {
           Propose a Protocol Claim
         </h1>
         <p style={{ fontSize: 14, color: "var(--muted)", marginTop: 4 }}>
-          Every claim initializes an epoch-1 constant-product market at 50/50 confidence ({mode === "demo" ? "Demo Ledger" : "NEAR Testnet"}).
+          Every claim initializes an epoch-1 constant-product market at 50/50 confidence ({mode === "demo" ? "Demo Ledger" : `NEAR ${NETWORK_LABEL}`}).
         </p>
       </div>
 

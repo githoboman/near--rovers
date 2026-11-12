@@ -101,6 +101,7 @@ export class PerpetuaDatabase {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         claim_id INTEGER NOT NULL,
         epoch INTEGER NOT NULL,
+        ruling_round INTEGER NOT NULL DEFAULT 1,
         verdict TEXT NOT NULL,
         supermajority_count INTEGER NOT NULL,
         total_models INTEGER NOT NULL,
@@ -114,8 +115,7 @@ export class PerpetuaDatabase {
         created_at INTEGER NOT NULL
       );
 
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_jury_rulings_claim_epoch
-        ON jury_rulings (claim_id, epoch);
+      DROP INDEX IF EXISTS idx_jury_rulings_claim_epoch;
 
       CREATE TABLE IF NOT EXISTS jury_model_outputs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -169,6 +169,19 @@ export class PerpetuaDatabase {
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
       );
+    `);
+
+    const cols = this.db
+      .prepare("PRAGMA table_info('jury_rulings')")
+      .all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === "ruling_round")) {
+      this.db.exec(
+        "ALTER TABLE jury_rulings ADD COLUMN ruling_round INTEGER NOT NULL DEFAULT 1;",
+      );
+    }
+    this.db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_jury_rulings_claim_epoch_round
+        ON jury_rulings (claim_id, epoch, ruling_round);
     `);
   }
 
@@ -446,10 +459,25 @@ export class PerpetuaDatabase {
     };
   }
 
-  getJuryRuling(claimId: number, epoch: number): JuryRulingRecord | null {
-    const r = this.db
-      .prepare(`SELECT * FROM jury_rulings WHERE claim_id = ? AND epoch = ?`)
-      .get(claimId, epoch) as Record<string, unknown> | undefined;
+  getJuryRuling(
+    claimId: number,
+    epoch: number,
+    rulingRound?: number,
+  ): JuryRulingRecord | null {
+    const r =
+      rulingRound !== undefined
+        ? (this.db
+            .prepare(
+              `SELECT * FROM jury_rulings WHERE claim_id = ? AND epoch = ? AND ruling_round = ?`,
+            )
+            .get(claimId, epoch, rulingRound) as
+            | Record<string, unknown>
+            | undefined)
+        : (this.db
+            .prepare(
+              `SELECT * FROM jury_rulings WHERE claim_id = ? AND epoch = ? ORDER BY ruling_round DESC LIMIT 1`,
+            )
+            .get(claimId, epoch) as Record<string, unknown> | undefined);
     if (!r) return null;
 
     const votesRaw = this.db
@@ -480,6 +508,7 @@ export class PerpetuaDatabase {
       id: Number(r.id),
       claim_id: Number(r.claim_id),
       epoch: Number(r.epoch),
+      ruling_round: Number(r.ruling_round ?? 1),
       verdict: String(r.verdict) as Verdict,
       supermajority_count: Number(r.supermajority_count),
       total_models: Number(r.total_models),
@@ -496,24 +525,28 @@ export class PerpetuaDatabase {
   }
 
   saveJuryRuling(ruling: JuryRulingRecord): number {
+    const round = ruling.ruling_round ?? 1;
     this.db.exec("BEGIN");
     try {
       this.db
-        .prepare(`DELETE FROM jury_rulings WHERE claim_id = ? AND epoch = ?`)
-        .run(ruling.claim_id, ruling.epoch);
+        .prepare(
+          `DELETE FROM jury_rulings WHERE claim_id = ? AND epoch = ? AND ruling_round = ?`,
+        )
+        .run(ruling.claim_id, ruling.epoch, round);
 
       const res = this.db
         .prepare(
           `INSERT INTO jury_rulings (
-            claim_id, epoch, verdict, supermajority_count, total_models,
+            claim_id, epoch, ruling_round, verdict, supermajority_count, total_models,
             required_majority, evidence_packet_json, evidence_hash,
             attestation_bundle_json, attestation_hash, submitted_tx_hash,
             mode, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           ruling.claim_id,
           ruling.epoch,
+          round,
           ruling.verdict,
           ruling.supermajority_count,
           ruling.total_models,
@@ -571,12 +604,13 @@ export class PerpetuaDatabase {
     claimId: number,
     epoch: number,
     txHash: string,
+    rulingRound = 1,
   ): void {
     this.db
       .prepare(
-        `UPDATE jury_rulings SET submitted_tx_hash = ? WHERE claim_id = ? AND epoch = ?`,
+        `UPDATE jury_rulings SET submitted_tx_hash = ? WHERE claim_id = ? AND epoch = ? AND ruling_round = ?`,
       )
-      .run(txHash, claimId, epoch);
+      .run(txHash, claimId, epoch, rulingRound);
   }
 
   saveGeneratedPage(page: GeneratedPageRecord): number {

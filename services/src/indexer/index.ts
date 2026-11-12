@@ -54,38 +54,49 @@ export class PerpetuaIndexer {
       for (const claim of batch) {
         this.db.upsertClaim(claim);
         claimsSynced += 1;
+      }
 
-        const market = await this.nearClient.getMarket(claim.id, claim.current_epoch);
-        if (!market) continue;
+      const marketConcurrency = 5;
+      for (let i = 0; i < batch.length; i += marketConcurrency) {
+        const slice = batch.slice(i, i + marketConcurrency);
+        const markets = await Promise.all(
+          slice.map((c) => this.nearClient.getMarket(c.id, c.current_epoch)),
+        );
 
-        const prevMarket = this.db.getMarket(claim.id, market.epoch);
-        this.db.upsertMarket(market);
-        marketsSynced += 1;
+        for (let j = 0; j < slice.length; j++) {
+          const claim = slice[j];
+          const market = markets[j];
+          if (!market) continue;
 
-        const prices = priceE6(BigInt(market.yes_reserve), BigInt(market.no_reserve));
-        const recorded = this.db.recordPricePointIfChanged({
-          claim_id: claim.id,
-          epoch: market.epoch,
-          timestamp_ms: Date.now(),
-          yes_price_e6: prices.yes,
-          no_price_e6: prices.no,
-          yes_reserve: market.yes_reserve,
-          no_reserve: market.no_reserve,
-          fee_pool: market.fee_pool,
-          trigger_event: triggerEvent,
-        });
-        if (recorded) {
-          pricePointsRecorded += 1;
-        }
+          const prevMarket = this.db.getMarket(claim.id, market.epoch);
+          this.db.upsertMarket(market);
+          marketsSynced += 1;
 
-        if (market.status === "Escalated") {
-          escalatedMarkets.push({ claim, market });
-        }
+          const prices = priceE6(BigInt(market.yes_reserve), BigInt(market.no_reserve));
+          const recorded = this.db.recordPricePointIfChanged({
+            claim_id: claim.id,
+            epoch: market.epoch,
+            timestamp_ms: Date.now(),
+            yes_price_e6: prices.yes,
+            no_price_e6: prices.no,
+            yes_reserve: market.yes_reserve,
+            no_reserve: market.no_reserve,
+            fee_pool: market.fee_pool,
+            trigger_event: triggerEvent,
+          });
+          if (recorded) {
+            pricePointsRecorded += 1;
+          }
 
-        const priceChanged =
-          recorded || !prevMarket || prevMarket.status !== market.status;
-        if (priceChanged) {
-          settledOrChangedClaims.push({ claim, market });
+          if (market.status === "Escalated") {
+            escalatedMarkets.push({ claim, market });
+          }
+
+          const priceChanged =
+            recorded || !prevMarket || prevMarket.status !== market.status;
+          if (priceChanged) {
+            settledOrChangedClaims.push({ claim, market });
+          }
         }
       }
     }

@@ -145,7 +145,7 @@ export class PerpetuaNearClient {
     const contractId = this.assertContract();
     const account = this.assertSigner();
     const depositStr = assertDecimalString(params.depositNear ?? "2.5");
-    const outcome = await account.callFunction({
+    const outcome = await account.callFunctionRaw({
       contractId,
       methodName: "create_claim",
       args: {
@@ -154,7 +154,7 @@ export class PerpetuaNearClient {
         category: params.category,
         epoch_length: params.epoch_length_ns,
       },
-      gas: teraToGas("50"),
+      gas: teraToGas("60"),
       deposit: nearToYocto(depositStr),
     });
     return extractTxHash(outcome);
@@ -169,7 +169,7 @@ export class PerpetuaNearClient {
     const contractId = this.assertContract();
     const account = this.assertSigner();
     const depositStr = assertDecimalString(params.depositNear);
-    const outcome = await account.callFunction({
+    const outcome = await account.callFunctionRaw({
       contractId,
       methodName: "buy",
       args: {
@@ -177,7 +177,7 @@ export class PerpetuaNearClient {
         outcome: params.outcome,
         min_shares: params.minShares ?? "1",
       },
-      gas: teraToGas("30"),
+      gas: teraToGas("40"),
       deposit: nearToYocto(depositStr),
     });
     return extractTxHash(outcome);
@@ -190,13 +190,13 @@ export class PerpetuaNearClient {
   }): Promise<string> {
     const contractId = this.assertContract();
     const account = this.assertSigner();
-    const outcome = await account.callFunction({
+    const outcome = await account.callFunctionRaw({
       contractId,
       methodName: "escalate",
       args: params.assertedOutcome
         ? { claim_id: params.claimId, asserted_outcome: params.assertedOutcome }
         : { claim_id: params.claimId },
-      gas: teraToGas("35"),
+      gas: teraToGas("50"),
       deposit: BigInt(params.depositYocto),
     });
     return extractTxHash(outcome);
@@ -209,7 +209,7 @@ export class PerpetuaNearClient {
   }): Promise<string> {
     const contractId = this.assertContract();
     const account = this.assertSigner();
-    const outcome = await account.callFunction({
+    const outcome = await account.callFunctionRaw({
       contractId,
       methodName: "submit_ruling",
       args: {
@@ -217,7 +217,7 @@ export class PerpetuaNearClient {
         verdict: params.verdict,
         attestation_hash: params.attestationHash,
       },
-      gas: teraToGas("35"),
+      gas: teraToGas("40"),
       deposit: 0n,
     });
     return extractTxHash(outcome);
@@ -226,11 +226,11 @@ export class PerpetuaNearClient {
   async settle(claimId: number): Promise<string> {
     const contractId = this.assertContract();
     const account = this.assertSigner();
-    const outcome = await account.callFunction({
+    const outcome = await account.callFunctionRaw({
       contractId,
       methodName: "settle",
       args: { claim_id: claimId },
-      gas: teraToGas("100"),
+      gas: teraToGas("120"),
       deposit: 0n,
     });
     return extractTxHash(outcome);
@@ -239,7 +239,7 @@ export class PerpetuaNearClient {
   async redeem(claimId: number, epoch?: number): Promise<string> {
     const contractId = this.assertContract();
     const account = this.assertSigner();
-    const outcome = await account.callFunction({
+    const outcome = await account.callFunctionRaw({
       contractId,
       methodName: "redeem",
       args: epoch !== undefined ? { claim_id: claimId, epoch } : { claim_id: claimId },
@@ -252,7 +252,7 @@ export class PerpetuaNearClient {
   async setPageHash(claimId: number, hash: string): Promise<string> {
     const contractId = this.assertContract();
     const account = this.assertSigner();
-    const outcome = await account.callFunction({
+    const outcome = await account.callFunctionRaw({
       contractId,
       methodName: "set_page_hash",
       args: { claim_id: claimId, hash },

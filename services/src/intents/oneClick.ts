@@ -18,6 +18,7 @@ export interface OneClickQuotePreviewRequest {
   refundTo: string;
   slippageTolerance?: number;
   swapType?: "EXACT_INPUT" | "EXACT_OUTPUT";
+  dry?: boolean;
 }
 
 export class OneClickIntentsClient {
@@ -36,6 +37,7 @@ export class OneClickIntentsClient {
   async listTokens(): Promise<{ tokens: OneClickToken[]; testnetNotice: string | null }> {
     const res = await this.fetchImpl(`${this.baseUrl}/v0/tokens`, {
       headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) {
       throw new Error(`1Click /v0/tokens failed (${res.status})`);
@@ -52,7 +54,7 @@ export class OneClickIntentsClient {
 
   async previewQuote(req: OneClickQuotePreviewRequest): Promise<unknown> {
     // Enforce dry=true whenever running in testnet mode so no real funds deposit address is issued.
-    const dryOnly = true;
+    const dryOnly = this.networkId !== "mainnet" ? true : req.dry !== false;
     const deadline = new Date(Date.now() + 3 * 60 * 1000).toISOString();
 
     const headers: Record<string, string> = {
@@ -66,6 +68,7 @@ export class OneClickIntentsClient {
     const res = await this.fetchImpl(`${this.baseUrl}/v0/quote`, {
       method: "POST",
       headers,
+      signal: AbortSignal.timeout(10_000),
       body: JSON.stringify({
         dry: dryOnly,
         swapType: req.swapType ?? "EXACT_INPUT",

@@ -22,6 +22,7 @@ export interface PerpetuaServiceConfig {
   autoGeneratePages: boolean;
   allowUnverifiedFallback: boolean;
   corsOrigin: string;
+  adminApiToken: string;
 }
 
 const DEFAULT_JURY_MODELS = [
@@ -109,5 +110,6 @@ export function loadConfig(): PerpetuaServiceConfig {
     autoGeneratePages: process.env.AUTO_GENERATE_PAGES !== "false",
     allowUnverifiedFallback: process.env.ALLOW_UNVERIFIED_FALLBACK === "true",
     corsOrigin: process.env.CORS_ORIGIN || "*",
+    adminApiToken: process.env.ADMIN_API_TOKEN || "",
   };
 }

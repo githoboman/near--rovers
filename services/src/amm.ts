@@ -2,7 +2,12 @@ import type { Outcome } from "./types.ts";
 
 export const PRICE_PRECISION = 1_000_000n;
 export const BPS_DENOM = 10_000n;
+export const MIN_RESERVE = 1_000_000n;
 export const YOCTO_PER_NEAR = 1_000_000_000_000_000_000_000_000n;
+
+function divCeil(num: bigint, den: bigint): bigint {
+  return (num + den - 1n) / den;
+}
 
 export function priceE6(reserveYes: bigint, reserveNo: bigint): { yes: number; no: number } {
   const total = reserveYes + reserveNo;
@@ -34,7 +39,10 @@ export function quoteBuy(
   feeBps: number,
 ): { sharesOut: bigint; fee: bigint; newYes: bigint; newNo: bigint } {
   if (collateralIn <= 0n) throw new Error("collateral_in must be > 0");
-  const fee = (collateralIn * BigInt(feeBps)) / BPS_DENOM;
+  if (reserveYes < MIN_RESERVE || reserveNo < MIN_RESERVE) {
+    throw new Error("market reserve below MIN_RESERVE");
+  }
+  const fee = divCeil(collateralIn * BigInt(feeBps), BPS_DENOM);
   const net = collateralIn - fee;
   if (net <= 0n) throw new Error("collateral_in too small after fee");
 
@@ -43,7 +51,8 @@ export function quoteBuy(
 
   const newOther = rOther + net;
   const k = reserveYes * reserveNo;
-  const newTarget = (k + newOther - 1n) / newOther;
+  const newTarget = divCeil(k, newOther);
+  if (newTarget < MIN_RESERVE) throw new Error("buy breaches MIN_RESERVE");
   const swapOut = rTarget - newTarget;
   const sharesOut = net + swapOut;
 
@@ -60,18 +69,26 @@ export function quoteSell(
   feeBps: number,
 ): { netCollateralOut: bigint; grossCollateralOut: bigint; fee: bigint } {
   if (sharesIn <= 0n) throw new Error("shares_in must be > 0");
+  if (reserveYes < MIN_RESERVE || reserveNo < MIN_RESERVE) {
+    throw new Error("market reserve below MIN_RESERVE");
+  }
   const rTarget = outcome === "Yes" ? reserveYes : reserveNo;
   const rOther = outcome === "Yes" ? reserveNo : reserveYes;
 
   const b = rTarget + rOther + sharesIn;
-  const fourK = 4n * reserveYes * reserveNo;
-  const disc = b * b - fourK;
+  const fourSRout = 4n * sharesIn * rOther;
+  const disc = b * b - fourSRout;
   const sqrtDisc = isqrtCeil(disc);
   const twoNet = b - sqrtDisc;
   const net = twoNet / 2n;
   if (net <= 0n) throw new Error("sell output rounds to zero");
+  const newROut = rOther - net;
+  const newRIn = rTarget + sharesIn - net;
+  if (newROut < MIN_RESERVE || newRIn < MIN_RESERVE) {
+    throw new Error("sell breaches MIN_RESERVE");
+  }
 
-  const fee = (net * BigInt(feeBps)) / BPS_DENOM;
+  const fee = divCeil(net * BigInt(feeBps), BPS_DENOM);
   return {
     grossCollateralOut: net,
     fee,

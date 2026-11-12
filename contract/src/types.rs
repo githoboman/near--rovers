@@ -26,6 +26,10 @@ pub const MAX_CATEGORY_LEN: usize = 64;
 pub const MAX_EVIDENCE_URIS: usize = 10;
 pub const MAX_URI_LEN: usize = 512;
 pub const MAX_HASH_LEN: usize = 128;
+/// Epoch length bounds (10s minimum, 10 years maximum) to prevent instant expiry
+/// and `opened_at + epoch_length` u64 overflow panics in future epochs.
+pub const MIN_EPOCH_LENGTH_NS: u64 = 10_000_000_000;
+pub const MAX_EPOCH_LENGTH_NS: u64 = 315_360_000_000_000_000;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[near(serializers = [json, borsh])]

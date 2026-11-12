@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Wallet, LogOut, FlaskConical, Radio } from "lucide-react";
 import { formatNear } from "@/lib/amm";
-import { CONTRACT_ID } from "@/lib/near";
+import { CONTRACT_ID, NETWORK_LABEL } from "@/lib/near";
 import { useNear } from "@/providers/NearProvider";
 import { usePerpetua } from "@/providers/PerpetuaStore";
 
@@ -27,7 +27,7 @@ export function TopNav() {
             </svg>
             <span>Perpetua</span>
             <span className="pill" style={{ fontSize: 11, height: 20, color: "var(--muted)" }}>
-              Testnet
+              {NETWORK_LABEL}
             </span>
           </Link>
 
@@ -54,8 +54,8 @@ export function TopNav() {
             onClick={() => setMode(mode === "demo" ? "live" : "demo")}
             title={
               mode === "demo"
-                ? "Using seeded offline AMM & article simulator; click to query NEAR Testnet"
-                : `Querying ${CONTRACT_ID || "NEAR Testnet"}`
+                ? `Using seeded offline AMM & article simulator; click to query NEAR ${NETWORK_LABEL}`
+                : `Querying ${CONTRACT_ID || `NEAR ${NETWORK_LABEL}`}`
             }
           >
             {mode === "demo" ? (
@@ -66,7 +66,7 @@ export function TopNav() {
             ) : (
               <>
                 <Radio size={14} color="#0f6d4a" />
-                <span>Live Testnet</span>
+                <span>Live {NETWORK_LABEL}</span>
               </>
             )}
           </button>

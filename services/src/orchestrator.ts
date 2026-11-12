@@ -38,7 +38,8 @@ export class PerpetuaOrchestrator {
 
     if (this.config.autoRunJury) {
       for (const { claim, market } of sync.escalatedMarkets) {
-        const existing = this.db.getJuryRuling(claim.id, market.epoch);
+        const round = market.counter_challenger ? 2 : 1;
+        const existing = this.db.getJuryRuling(claim.id, market.epoch, round);
         if (!existing || !existing.submitted_tx_hash) {
           await this.jury.resolveEscalatedClaim(claim, market);
           rulingsProcessed += 1;

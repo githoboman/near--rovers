@@ -4,8 +4,13 @@ import { ClaimView, ContractConfigView, MarketView, Outcome, PositionView } from
 export const NEAR_NETWORK =
   (process.env.NEXT_PUBLIC_NEAR_NETWORK as "testnet" | "mainnet" | undefined) ?? "testnet";
 
+export const NETWORK_LABEL = NEAR_NETWORK === "mainnet" ? "Mainnet" : "Testnet";
+
 export const NEAR_RPC_URL =
-  process.env.NEXT_PUBLIC_NEAR_RPC_URL || "https://test.rpc.fastnear.com";
+  process.env.NEXT_PUBLIC_NEAR_RPC_URL ||
+  (NEAR_NETWORK === "mainnet"
+    ? "https://rpc.mainnet.fastnear.com"
+    : "https://test.rpc.fastnear.com");
 
 export const CONTRACT_ID = process.env.NEXT_PUBLIC_CONTRACT_ID || "";
 
@@ -157,6 +162,22 @@ export function buildEscalateTx(params: {
 }): WalletActionSpec {
   return {
     methodName: "escalate",
+    args: {
+      claim_id: params.claimId,
+      ...(params.assertedOutcome ? { asserted_outcome: params.assertedOutcome } : {}),
+    },
+    gas: GAS_TRADE,
+    deposit: params.bondYocto,
+  };
+}
+
+export function buildChallengeRulingTx(params: {
+  claimId: number;
+  assertedOutcome?: Outcome;
+  bondYocto: string;
+}): WalletActionSpec {
+  return {
+    methodName: "challenge_ruling",
     args: {
       claim_id: params.claimId,
       ...(params.assertedOutcome ? { asserted_outcome: params.assertedOutcome } : {}),

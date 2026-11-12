@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { ArrowRightLeft, ChevronDown, ChevronUp } from "lucide-react";
-import { SERVICES_URL } from "@/lib/near";
+import { NEAR_NETWORK, SERVICES_URL } from "@/lib/near";
 import { useNear } from "@/providers/NearProvider";
 
 interface TokenItem {
@@ -83,6 +83,10 @@ export function IntentsDepositPreview() {
       if (baseAmount === "0") {
         throw new Error("Enter a positive origin token amount");
       }
+      const trimmedRefund = refundTo.trim();
+      if (NEAR_NETWORK === "mainnet" && (!accountId || !trimmedRefund)) {
+        throw new Error("Connect a NEAR wallet and enter a valid origin refund address on Mainnet.");
+      }
       const res = await fetch(`${SERVICES_URL}/api/intents/quote`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -90,9 +94,10 @@ export function IntentsDepositPreview() {
           originAsset,
           destinationAsset: "nep141:wrap.near",
           amount: baseAmount,
-          recipient: accountId || "perpetua-demo.near",
-          refundTo: refundTo.trim() || "0x0000000000000000000000000000000000000000",
+          recipient: accountId || "perpetua-preview.testnet",
+          refundTo: trimmedRefund || "0x0000000000000000000000000000000000000000",
           slippageTolerance: 100,
+          dry: true,
         }),
       });
       const data = (await res.json()) as {

@@ -20,6 +20,7 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
     mode,
     config,
     executeEscalate,
+    executeChallengeRuling,
     runDemoJuryFlow,
     fastForwardDemoChallengeWindow,
     executeSettle,
@@ -37,6 +38,8 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
   }, [market.status]);
 
   const bondFormatted = formatNear(config.escalation_bond, 2);
+  const counterBondFormatted = formatNear((BigInt(config.escalation_bond) * 2n).toString(), 2);
+  const counterSide: Outcome = market.verdict === "True" ? "No" : "Yes";
   const deadlineMs = market.challenge_deadline
     ? Number(BigInt(market.challenge_deadline) / 1_000_000n)
     : 0;
@@ -51,6 +54,19 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
       setMsg(`Claim escalated with ${bondFormatted} Ⓝ bond asserting ${side}.`);
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Escalation failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleChallengeRuling = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await executeChallengeRuling(claimId, counterSide);
+      setMsg(`Counter-challenged ruling asserting ${counterSide} with ${counterBondFormatted} Ⓝ bond.`);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Counter-challenge failed");
     } finally {
       setBusy(false);
     }
@@ -257,6 +273,21 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
               </span>
             </div>
           </div>
+
+          {windowOpen && !market.counter_challenger && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => void handleChallengeRuling()}
+              disabled={busy}
+              style={{ width: "100%" }}
+            >
+              <AlertTriangle size={13} />
+              <span>
+                Counter-Challenge ({counterSide}) · {counterBondFormatted} Ⓝ (2x Bond)
+              </span>
+            </button>
+          )}
 
           {mode === "demo" && windowOpen && (
             <button

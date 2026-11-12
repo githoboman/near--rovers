@@ -156,6 +156,7 @@ export class NearAiCloudClient {
           Accept: "application/json",
           ...authHeaders,
         },
+        signal: AbortSignal.timeout(10_000),
       });
       if (attRes.ok) {
         report = (await attRes.json()) as AttestationReportResponse;
@@ -196,6 +197,7 @@ export class NearAiCloudClient {
         ...authHeaders,
       },
       body: rawRequest,
+      signal: AbortSignal.timeout(35_000),
     });
 
     const rawRespBuffer = Buffer.from(await chatRes.arrayBuffer());
@@ -234,6 +236,7 @@ export class NearAiCloudClient {
             Accept: "application/json",
             Authorization: `Bearer ${this.apiKey}`,
           },
+          signal: AbortSignal.timeout(10_000),
         });
         if (sigRes.status === 404 && attempt < retries) {
           await new Promise((r) => setTimeout(r, 350));

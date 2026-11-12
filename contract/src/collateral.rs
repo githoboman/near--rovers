@@ -51,20 +51,14 @@ impl CollateralAdapter {
         }
     }
 
-    /// Refunds excess attached deposit back to caller synchronously without
-    /// altering protocol vaults (e.g. surplus above fixed escalation bond).
+    /// Refunds excess attached deposit back to caller without altering protocol vaults
+    /// (e.g. surplus above fixed escalation bond). Routes through callback recovery so
+    /// smart-contract callers can pull failed transfers via `withdraw_refund`.
     pub fn refund_excess(asset: &CollateralAsset, recipient: AccountId, excess: u128) {
         if excess == 0 {
             return;
         }
-        match asset {
-            CollateralAsset::NativeNear => {
-                let _ = Promise::new(recipient).transfer(NearToken::from_yoctonear(excess));
-            }
-            CollateralAsset::Nep141 { .. } => {
-                env::panic_str("NEP-141 excess refund not enabled in MVP")
-            }
-        }
+        let _ = Self::transfer_with_callback(asset, recipient, excess);
     }
 }
 
