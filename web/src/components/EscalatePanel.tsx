@@ -11,11 +11,13 @@ interface EscalatePanelProps {
   market: MarketView;
   ruling: JuryRulingRecord | null;
   position?: PositionView;
+  /** Set false when the page already renders the full jury record elsewhere. */
+  showVotes?: boolean;
 }
 
 const STEPS: Array<MarketView["status"]> = ["Open", "Escalated", "Ruled", "Settled"];
 
-export function EscalatePanel({ claimId, market, ruling, position }: EscalatePanelProps) {
+export function EscalatePanel({ claimId, market, ruling, position, showVotes = true }: EscalatePanelProps) {
   const {
     mode,
     config,
@@ -29,10 +31,14 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
   const [side, setSide] = useState<Outcome>(market.yes_price_e6 >= 500_000 ? "No" : "Yes");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  const [nowMs, setNowMs] = useState(0);
 
   useEffect(() => {
-    if (market.status !== "Ruled") return;
+    if (market.status !== "Ruled") {
+      setNowMs(0);
+      return;
+    }
+    setNowMs(Date.now());
     const timer = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [market.status]);
@@ -43,8 +49,9 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
   const deadlineMs = market.challenge_deadline
     ? Number(BigInt(market.challenge_deadline) / 1_000_000n)
     : 0;
-  const remainingSec = Math.max(0, Math.ceil((deadlineMs - nowMs) / 1000));
-  const windowOpen = market.status === "Ruled" && remainingSec > 0;
+  const clockReady = nowMs > 0;
+  const remainingSec = clockReady ? Math.max(0, Math.ceil((deadlineMs - nowMs) / 1000)) : null;
+  const windowOpen = market.status === "Ruled" && remainingSec !== null && remainingSec > 0;
 
   const handleEscalate = async () => {
     setBusy(true);
@@ -266,7 +273,7 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
                 <span style={{ color: "var(--ink)" }}>Attested Verdict: {market.verdict}</span>
               </div>
               <span className="pill pill-contested" style={{ fontSize: 10.5 }}>
-                {windowOpen ? "Challenge Active" : "Finalized"}
+                {windowOpen ? "Challenge Active" : clockReady ? "Finalized" : "Checking"}
               </span>
             </div>
 
@@ -293,7 +300,7 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
                 alignItems: "center",
                 gap: 5,
                 fontSize: 11.5,
-                color: windowOpen ? "var(--contested)" : "var(--yes)",
+                color: windowOpen ? "var(--contested)" : clockReady ? "var(--yes)" : "var(--muted)",
                 marginTop: 6,
               }}
             >
@@ -301,7 +308,9 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
               <span>
                 {windowOpen
                   ? `Challenge window: ${remainingSec}s remaining`
-                  : "Challenge window elapsed · Ready for settlement"}
+                  : clockReady
+                  ? "Challenge window elapsed · Ready for settlement"
+                  : "Checking challenge window…"}
               </span>
             </div>
           </div>
@@ -336,13 +345,15 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
             type="button"
             className="btn btn-primary"
             onClick={() => void handleSettle()}
-            disabled={busy || windowOpen}
+            disabled={busy || !clockReady || windowOpen}
             style={{ width: "100%", height: 36 }}
           >
             <CheckCircle2 size={13} />
             <span>
               {busy
                 ? "Settling on NEAR..."
+                : !clockReady
+                ? "Checking challenge window..."
                 : windowOpen
                 ? `Settle Locked (${remainingSec}s)`
                 : "Settle & Open Next Epoch"}
@@ -352,7 +363,7 @@ export function EscalatePanel({ claimId, market, ruling, position }: EscalatePan
       )}
 
       {/* Attested Jury Votes Cards */}
-      {ruling && ruling.modelVotes.length > 0 && (
+      {showVotes && ruling && ruling.modelVotes.length > 0 && (
         <div
           style={{
             marginTop: 12,

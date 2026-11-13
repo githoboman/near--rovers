@@ -1,18 +1,22 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useId, useState } from "react";
 import { formatPct } from "@/lib/amm";
+import { formatTimeUtc } from "@/lib/format";
 import { PricePoint } from "@/lib/types";
 
 interface PriceHistoryChartProps {
   points: PricePoint[];
+  /** Compact variant for the sidebar. */
+  compact?: boolean;
 }
 
-export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
+export function PriceHistoryChart({ points, compact = false }: PriceHistoryChartProps) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const gradId = `chartGradient-${useId().replace(/:/g, "")}`;
 
-  const width = 680;
-  const height = 210;
+  const width = compact ? 400 : 680;
+  const height = compact ? 190 : 210;
   const padLeft = 44;
   const padRight = 16;
   const padTop = 18;
@@ -20,10 +24,18 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
   const plotW = width - padLeft - padRight;
   const plotH = height - padTop - padBottom;
 
-  const safePoints =
-    points.length > 0
-      ? points
-      : [{ timestampMs: Date.now(), yesPriceE6: 500_000, eventLabel: "Initial" }];
+  if (points.length === 0) {
+    return (
+      <section className="panel" style={{ padding: "18px 20px" }} aria-label="Price history">
+        <h2 className="eyebrow">Price history · YES</h2>
+        <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>
+          No recorded price history for this epoch.
+        </p>
+      </section>
+    );
+  }
+
+  const safePoints = points;
 
   const minTs = safePoints[0].timestampMs;
   const maxTs = Math.max(
@@ -45,11 +57,6 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
   const active = hoverIdx !== null ? coords[hoverIdx] : coords[coords.length - 1];
   const gridTicks = [0, 250_000, 500_000, 750_000, 1_000_000];
 
-  const formatTime = (ms: number) => {
-    const d = new Date(ms);
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  };
-
   // Build area fill polygon for subtle depth
   const areaPolygon = coords.length > 1
     ? `${coords[0].x.toFixed(1)},${(padTop + plotH).toFixed(1)} ` +
@@ -58,7 +65,7 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
     : "";
 
   return (
-    <section className="panel" style={{ padding: "18px 22px" }}>
+    <section className="panel" style={{ padding: "18px 20px" }} aria-label="Price history">
       <div
         style={{
           display: "flex",
@@ -69,15 +76,13 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
         }}
       >
         <div>
-          <h2 style={{ fontSize: 14.5, fontWeight: 600, color: "var(--ink)" }}>
-            Continuous Implied Confidence (YES)
-          </h2>
-          <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
-            {active.pt.eventLabel ?? "Trade execution"} · {formatTime(active.pt.timestampMs)}
+          <h2 className="eyebrow">Price history · YES</h2>
+          <p suppressHydrationWarning style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+            {active.pt.eventLabel ?? "Trade execution"} · {formatTimeUtc(active.pt.timestampMs)} UTC
             {active.pt.trader ? ` · ${active.pt.trader}` : ""}
           </p>
         </div>
-        <div className="tabular" style={{ fontSize: 18, fontWeight: 600, color: "var(--yes)" }}>
+        <div className="tabular" style={{ fontSize: 18, fontWeight: 500, color: "var(--ink)" }}>
           {formatPct(active.pt.yesPriceE6, 1)}
         </div>
       </div>
@@ -89,9 +94,9 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
         aria-label="Market confidence probability history chart"
       >
         <defs>
-          <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#10b981" stopOpacity="0.16" />
-            <stop offset="100%" stopColor="#10b981" stopOpacity="0.00" />
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#00c08b" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="#00c08b" stopOpacity="0.00" />
           </linearGradient>
         </defs>
 
@@ -136,18 +141,17 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
 
         {/* Area fill */}
         {areaPolygon && (
-          <polygon
-            points={areaPolygon}
-            fill="url(#chartGradient)"
-          />
+          <polygon className="chart-area" points={areaPolygon} fill={`url(#${gradId})`} />
         )}
 
         {/* Main curve */}
         {coords.length > 1 && (
           <polyline
             fill="none"
-            stroke="#10b981"
-            strokeWidth={2}
+            stroke="#00c08b"
+            strokeWidth={1.75}
+            className="chart-line"
+            pathLength={1}
             strokeLinejoin="round"
             strokeLinecap="round"
             points={polylinePoints}
@@ -171,7 +175,7 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
                   y1={padTop}
                   x2={c.x}
                   y2={padTop + plotH}
-                  stroke="var(--accent)"
+                  stroke="var(--muted)"
                   strokeWidth={1}
                   strokeDasharray="2 2"
                 />
@@ -180,7 +184,7 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
                 cx={c.x}
                 cy={c.y}
                 r={isActive ? 4.5 : isEvent ? 3 : 2}
-                fill={isActive ? "var(--accent)" : "#10b981"}
+                fill={isActive ? "var(--ink)" : "#00c08b"}
                 stroke="var(--surface)"
                 strokeWidth={1.5}
               />
@@ -194,9 +198,10 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
           y={height - 6}
           fontSize="10.5"
           fill="var(--muted-light)"
+          suppressHydrationWarning
           style={{ fontFamily: "var(--font-mono)" }}
         >
-          {formatTime(minTs)}
+          {formatTimeUtc(minTs)}
         </text>
         <text
           x={width - padRight}
@@ -204,9 +209,10 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
           textAnchor="end"
           fontSize="10.5"
           fill="var(--muted-light)"
+          suppressHydrationWarning
           style={{ fontFamily: "var(--font-mono)" }}
         >
-          {formatTime(maxTs)}
+          {formatTimeUtc(maxTs)}
         </text>
       </svg>
     </section>

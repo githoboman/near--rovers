@@ -2,14 +2,40 @@
 
 import React, { use, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, Link2, Coins } from "lucide-react";
-import { formatNear, formatPct } from "@/lib/amm";
+import { ArrowLeft, ExternalLink } from "lucide-react";
+import { formatPct } from "@/lib/amm";
+import { categoryLabel, chainTimeToDate, formatDateTime, hostOf } from "@/lib/format";
 import { confidenceBand } from "@/lib/seedClaims";
 import { ConfidenceArticle } from "@/components/ConfidenceArticle";
 import { PriceHistoryChart } from "@/components/PriceHistoryChart";
 import { TradeWidget } from "@/components/TradeWidget";
 import { EscalatePanel } from "@/components/EscalatePanel";
+import { ProbabilityReadout } from "@/components/claim/ProbabilityReadout";
+import { MarketStats } from "@/components/claim/MarketStats";
+import { ResolutionRecord } from "@/components/claim/ResolutionRecord";
+import { StatusBadge } from "@/components/StatusBadge";
 import { usePerpetua } from "@/providers/PerpetuaStore";
+
+function ClaimSkeleton() {
+  return (
+    <div className="claim-page" aria-label="Loading claim">
+      <div className="skeleton" style={{ height: 12, width: 160, marginBottom: 20 }} />
+      <div className="skeleton" style={{ height: 36, width: "70%", marginBottom: 12 }} />
+      <div className="skeleton" style={{ height: 36, width: "45%", marginBottom: 40 }} />
+      <div className="claim-grid">
+        <div className="claim-main">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="skeleton" style={{ height: 18, width: `${92 - i * 9}%` }} />
+          ))}
+        </div>
+        <div className="claim-side">
+          <div className="skeleton" style={{ height: 150 }} />
+          <div className="skeleton" style={{ height: 190 }} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ClaimDetailPage({
   params,
@@ -18,7 +44,7 @@ export default function ClaimDetailPage({
 }) {
   const { id } = use(params);
   const claimId = Number(id);
-  const { getBundle, positions, refreshClaim } = usePerpetua();
+  const { getBundle, positions, refreshClaim, loading } = usePerpetua();
   const bundle = getBundle(claimId);
 
   useEffect(() => {
@@ -28,12 +54,13 @@ export default function ClaimDetailPage({
   }, [claimId, refreshClaim]);
 
   if (!bundle) {
+    if (loading) return <ClaimSkeleton />;
     return (
       <div className="panel" style={{ padding: 32 }}>
         <p style={{ color: "var(--muted)", marginBottom: 12 }}>
           Claim #{id} was not found in the active ledger.
         </p>
-        <Link href="/" className="btn">
+        <Link href="/encyclopedia" className="btn">
           <ArrowLeft size={14} />
           <span>Back to Encyclopedia</span>
         </Link>
@@ -43,191 +70,144 @@ export default function ClaimDetailPage({
 
   const { claim, market, history, article, ruling } = bundle;
   const band = confidenceBand(market.yes_price_e6);
-  const pillClass =
-    band === "high" ? "pill-yes" : band === "low" ? "pill-no" : "pill-contested";
+  const bandColor = band === "high" ? "var(--yes)" : band === "low" ? "var(--no)" : "var(--contested)";
+  const createdAt = chainTimeToDate(claim.created_at);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Breadcrumb & Header */}
-      <div>
-        <Link
-          href="/"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            fontSize: 12.5,
-            color: "var(--muted)",
-            marginBottom: 10,
-            transition: "color 0.15s ease",
-          }}
-        >
-          <ArrowLeft size={13} />
-          <span>All Claims</span>
-        </Link>
-
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            gap: 16,
-          }}
-        >
-          <div style={{ maxWidth: 840 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-              <span className="pill tabular" style={{ fontSize: 11 }}>
-                Claim #{claim.id}
-              </span>
-              <span className="pill" style={{ fontSize: 11 }}>
-                {claim.category}
-              </span>
-              <span className="pill tabular" style={{ fontSize: 11 }}>
-                Epoch #{market.epoch} · {market.status}
-              </span>
-            </div>
-            <h1
-              style={{
-                fontSize: 24,
-                fontWeight: 600,
-                lineHeight: 1.3,
-                letterSpacing: "-0.015em",
-                color: "var(--ink)",
-              }}
-            >
-              {claim.text}
-            </h1>
-          </div>
-
-          {/* Prominent Confidence Badge */}
-          <div
-            className="panel"
-            style={{
-              padding: "12px 18px",
-              display: "flex",
-              alignItems: "center",
-              gap: 14,
-            }}
+    <div className="claim-page">
+      {/* Breadcrumb & header */}
+      <header style={{ marginBottom: 44 }}>
+        <nav aria-label="Breadcrumb" style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 18 }}>
+          <Link
+            href="/encyclopedia"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, transition: "color var(--dur-fast) var(--ease)" }}
           >
-            <div>
-              <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>
-                Implied Confidence
-              </div>
-              <div className="tabular" style={{ fontSize: 24, fontWeight: 600, lineHeight: 1.2, color: "var(--ink)" }}>
-                {formatPct(market.yes_price_e6, 1)}
-              </div>
-            </div>
-            <span className={`pill ${pillClass}`} style={{ fontWeight: 600 }}>
-              {band === "high" ? "Supported" : band === "low" ? "Disputed" : "Contested"}
-            </span>
-          </div>
+            <ArrowLeft size={13} />
+            <span>Encyclopedia</span>
+          </Link>
+          <span style={{ margin: "0 8px", color: "var(--muted-light)" }}>/</span>
+          <span className="tabular">Claim #{claim.id}</span>
+        </nav>
+
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <span className="pill">{categoryLabel(claim.category)}</span>
+          <StatusBadge status={market.status} />
+          <span className="tabular" style={{ fontSize: 12, color: "var(--muted)" }}>
+            Epoch #{market.epoch}
+          </span>
         </div>
-      </div>
 
-      {/* Main 2-column workspace */}
+        <h1
+          className="serif"
+          style={{
+            fontSize: "clamp(28px, 3.6vw, 44px)",
+            fontWeight: 400,
+            lineHeight: 1.15,
+            letterSpacing: "-0.025em",
+            maxWidth: 900,
+          }}
+        >
+          {claim.text}
+        </h1>
+
+        <p className="tabular" style={{ marginTop: 16, fontSize: 12, color: "var(--muted)", overflowWrap: "anywhere" }}>
+          Proposed by {claim.creator}
+          {createdAt ? (
+            <>
+              {" · "}
+              <time suppressHydrationWarning dateTime={createdAt.toISOString()}>
+                {formatDateTime(createdAt)}
+              </time>
+            </>
+          ) : ""}
+        </p>
+      </header>
+
       <div className="claim-grid">
-        {/* Left: AI Article, Chart, Reserves & Evidence */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-          <ConfidenceArticle article={article} onChainPageHash={claim.page_hash} />
+        {/* Main column: article, evidence, resolution record */}
+        <div className="claim-main">
+          <ConfidenceArticle article={article} onChainPageHash={claim.page_hash} evidenceUris={claim.evidence_uris} />
 
-          <PriceHistoryChart points={history} />
-
-          {/* Market Reserves & Cited Evidence */}
-          <section className="panel" style={{ padding: "18px 22px" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                marginBottom: 12,
-              }}
-            >
-              <Coins size={14} color="var(--accent)" />
-              <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>
-                Pool Accounting & Solvency Reserves
-              </h2>
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
-                gap: 10,
-                paddingBottom: 14,
-                marginBottom: 14,
-                borderBottom: "1px solid var(--border)",
-              }}
-            >
-              <div style={{ padding: "8px 10px", borderRadius: 5, background: "var(--surface-muted)" }}>
-                <div style={{ fontSize: 11, color: "var(--muted)" }}>YES Reserve</div>
-                <div className="tabular" style={{ fontSize: 14, fontWeight: 600, marginTop: 2, color: "var(--yes)" }}>
-                  {formatNear(market.yes_reserve, 3)} Ⓝ
-                </div>
-              </div>
-              <div style={{ padding: "8px 10px", borderRadius: 5, background: "var(--surface-muted)" }}>
-                <div style={{ fontSize: 11, color: "var(--muted)" }}>NO Reserve</div>
-                <div className="tabular" style={{ fontSize: 14, fontWeight: 600, marginTop: 2, color: "var(--no)" }}>
-                  {formatNear(market.no_reserve, 3)} Ⓝ
-                </div>
-              </div>
-              <div style={{ padding: "8px 10px", borderRadius: 5, background: "var(--surface-muted)" }}>
-                <div style={{ fontSize: 11, color: "var(--muted)" }}>Collateral Vault</div>
-                <div className="tabular" style={{ fontSize: 14, fontWeight: 600, marginTop: 2, color: "var(--ink)" }}>
-                  {formatNear(market.collateral_vault, 3)} Ⓝ
-                </div>
-              </div>
-              <div style={{ padding: "8px 10px", borderRadius: 5, background: "var(--surface-muted)" }}>
-                <div style={{ fontSize: 11, color: "var(--muted)" }}>Fee Pool</div>
-                <div className="tabular" style={{ fontSize: 14, fontWeight: 600, marginTop: 2, color: "var(--contested)" }}>
-                  {formatNear(market.fee_pool, 4)} Ⓝ
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, marginBottom: 8, color: "var(--ink)" }}>
-              <Link2 size={13} color="var(--muted)" />
-              <span>Cited Source Evidence</span>
+          <section aria-labelledby="evidence-title">
+            <div className="section-title">
+              <h2 id="evidence-title">Evidence</h2>
+              <span className="tabular" style={{ fontSize: 12, color: "var(--muted)" }}>
+                {claim.evidence_uris.length} {claim.evidence_uris.length === 1 ? "source" : "sources"}
+              </span>
             </div>
             {claim.evidence_uris.length === 0 ? (
-              <p style={{ fontSize: 12.5, color: "var(--muted)" }}>No external evidence URIs attached.</p>
+              <p style={{ fontSize: 13.5, color: "var(--muted)" }}>No external evidence URIs attached.</p>
             ) : (
-              <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
-                {claim.evidence_uris.map((uri) => (
-                  <li key={uri}>
+              <ol style={{ listStyle: "none", borderTop: "1px solid var(--border)" }}>
+                {claim.evidence_uris.map((uri, i) => (
+                  <li
+                    key={uri}
+                    id={`evidence-${i + 1}`}
+                    style={{ display: "grid", gridTemplateColumns: "36px minmax(0,1fr)", gap: 8, padding: "14px 0", borderBottom: "1px solid var(--border)" }}
+                  >
+                    <span className="tabular" style={{ color: "var(--accent)", fontSize: 12, paddingTop: 2 }}>
+                      [{i + 1}]
+                    </span>
                     <a
                       href={uri}
                       target="_blank"
                       rel="noreferrer"
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        fontSize: 12.5,
-                        color: "var(--accent)",
-                        wordBreak: "break-all",
-                      }}
+                      style={{ display: "block", minWidth: 0 }}
+                      className="claim-link"
                     >
-                      <span>{uri}</span>
-                      <ExternalLink size={12} style={{ flexShrink: 0 }} />
+                      <span style={{ display: "block", fontSize: 14.5 }}>
+                        {hostOf(uri)} <ExternalLink size={12} style={{ verticalAlign: "-1px", marginLeft: 4 }} aria-hidden="true" />
+                      </span>
+                      <span style={{ display: "block", fontSize: 12, color: "var(--muted-light)", fontWeight: 400, overflowWrap: "anywhere", marginTop: 2 }}>
+                        {uri}
+                      </span>
                     </a>
                   </li>
                 ))}
-              </ul>
+              </ol>
             )}
+          </section>
+
+          <section aria-labelledby="resolution-title">
+            <div className="section-title">
+              <h2 id="resolution-title">Resolution record</h2>
+              <span className="tabular" style={{ fontSize: 12, color: bandColor }}>
+                {formatPct(market.yes_price_e6, 1)} YES
+              </span>
+            </div>
+            <ResolutionRecord bundle={bundle} />
           </section>
         </div>
 
-        {/* Right Rail: Trade + Escalation/Jury */}
-        <aside style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <TradeWidget claimId={claim.id} market={market} position={positions[claim.id]} />
+        {/* Sidebar: probability, chart, trading, liquidity & epoch, escalation */}
+        <aside className="claim-side" aria-label="Market">
+          <ProbabilityReadout market={market} history={history} />
+          <PriceHistoryChart points={history} compact />
+          <div id="trade-panel">
+            <TradeWidget claimId={claim.id} market={market} position={positions[claim.id]} />
+          </div>
+          <MarketStats market={market} />
           <EscalatePanel
             claimId={claim.id}
             market={market}
             ruling={ruling}
             position={positions[claim.id]}
+            showVotes={false}
           />
         </aside>
+      </div>
+
+      {/* Mobile trade bar */}
+      <div className="mobile-trade-bar">
+        <div>
+          <div className="eyebrow">YES</div>
+          <div className="serif tabular" style={{ fontSize: 22, color: bandColor, lineHeight: 1.1 }}>
+            {formatPct(market.yes_price_e6, 1)}
+          </div>
+        </div>
+        <a href="#trade-panel" className="btn btn-primary">
+          Trade
+        </a>
       </div>
     </div>
   );

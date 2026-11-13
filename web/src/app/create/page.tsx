@@ -51,7 +51,7 @@ export default function CreateClaimPage() {
   return (
     <div style={{ maxWidth: 680, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
       <Link
-        href="/"
+        href="/encyclopedia"
         style={{
           display: "inline-flex",
           alignItems: "center",
@@ -221,7 +221,7 @@ export default function CreateClaimPage() {
         )}
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
-          <Link href="/" className="btn">
+          <Link href="/encyclopedia" className="btn">
             Cancel
           </Link>
           <button type="submit" className="btn btn-primary" disabled={submitting || !text.trim()}>
